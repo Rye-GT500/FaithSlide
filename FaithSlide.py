@@ -1,4 +1,5 @@
 from docx import Document
+import os
 # FaithSlide.py
 
 # 簡稱 -> 全名
@@ -75,7 +76,9 @@ abbr_to_full = {
 full_to_abbr = {v: k for k, v in abbr_to_full.items()}
 
 # 請改成你的 Word 路徑
-file_path = r"D:\kou ray\python\church\20250928新竹主日週報.docx"
+self_path = os.path.abspath(__file__)
+base_path = os.path.dirname(self_path)
+file_path = os.path.join(base_path, "20250928新竹主日週報.docx")
 doc = Document(file_path)
 ReadTheBible = []
 Promise = []
@@ -111,5 +114,3 @@ if not Promise:
     print("證道抓取失敗")
 else:
     print("證道:", Promise)
-
-print("hello world")
