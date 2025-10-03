@@ -113,9 +113,19 @@ else:
     print(main_verses)
     del ReadTheBible[0]
     for verses in ReadTheBible:
-        print(verses.replace("[", "").replace("]", " "))
+        print(verses.replace("[", "").replace("]", "."))
 print()
 if not Promise:
     print("證道抓取失敗")
+
 else:
     print("證道:", Promise)
+    title = {"headline":"", "title":[], "subtitle":[]}
+    for text in Promise:
+        for symbol in ["，", "、"]:
+            if symbol in text:
+                if symbol == "，":
+                    title["headline"] = text
+                elif symbol == "、":
+                    title["title"].append(text)
+    print(title)
