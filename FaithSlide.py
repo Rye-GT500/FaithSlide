@@ -108,7 +108,12 @@ for t_idx, table in enumerate(doc.tables):
 if not ReadTheBible:
     print("讀經抓取失敗")
 else:
-    print("讀經:", ReadTheBible)
+    print("讀經:")
+    main_verses = ReadTheBible[0]
+    print(main_verses)
+    del ReadTheBible[0]
+    for verses in ReadTheBible:
+        print(verses.replace("[", "").replace("]", " "))
 print()
 if not Promise:
     print("證道抓取失敗")
