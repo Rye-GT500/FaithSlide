@@ -1,6 +1,29 @@
 from docx import Document
+from pptx import Presentation
+from pptx.util import Inches
+import copy
 import os
 # FaithSlide.py
+
+def duplicate_slide(prs:Presentation, index):
+    template_slide = prs.slides[index]
+    new_slide = prs.slides.add_slide(template_slide.slide_layout)
+    for shape in list(new_slide.shapes):
+        if shape.is_placeholder:
+            sp = shape
+            new_slide.shapes._spTree.remove(sp._element)
+    for shape in template_slide.shapes:
+        # if not shape.is_placeholder:
+            el = shape.element
+            new_el = copy.deepcopy(el)
+            new_slide.shapes._spTree.insert_element_before(new_el, 'p:extLst')
+    return new_slide
+
+def remove_slide(prs:Presentation, index):
+    xml_slides = prs.slides._sldIdLst
+    slide = list(xml_slides)
+    xml_slides.remove(slide[index])
+
 
 # 簡稱 -> 全名
 abbr_to_full = {
@@ -74,12 +97,17 @@ abbr_to_full = {
 
 # 全名 -> 簡稱
 full_to_abbr = {v: k for k, v in abbr_to_full.items()}
+chinese_number = {"一", "二", "三", "四", "五", "六", "七", "八", "九", "十"}
+number = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
 
 # 請改成你的 Word 路徑
 self_path = os.path.abspath(__file__)
 base_path = os.path.dirname(self_path)
-file_path = os.path.join(base_path, "20250928新竹主日週報.docx")
-doc = Document(file_path)
+wordfile_path = os.path.join(base_path, "202501005新竹主日週報.docx")
+# file_path = os.path.join(base_path, "20250928新竹主日週報.docx")
+template_ppt_file = os.path.join(base_path, "template.pptx")
+prs = Presentation(template_ppt_file)
+doc = Document(wordfile_path)
 ReadTheBible = []
 Promise = []
 
@@ -110,22 +138,89 @@ if not ReadTheBible:
 else:
     print("讀經:")
     main_verses = ReadTheBible[0]
+    
+    if "，" in main_verses:
+        main_book = ""
+        for text in main_verses:
+            if text in chinese_number:
+                break
+            main_book += text
+        main_verses = main_verses.replace("，", " " + main_book).split()
     print(main_verses)
     del ReadTheBible[0]
-    for verses in ReadTheBible:
-        print(verses.replace("[", "").replace("]", "."))
+    for verses_index in range(0, len(ReadTheBible)):
+        ReadTheBible[verses_index] = ReadTheBible[verses_index].replace("[", "").replace("]", ".")
+    verses_index = 0
+
+    if not isinstance(main_verses, list):
+        main_verses = [main_verses]
+
+    print(ReadTheBible)
+    for verses in main_verses:
+        first_num = 0
+        second_num = 0
+        first_end = False
+        for text in verses:
+            if text in number:
+                if not first_end:
+                    first_num *= 10
+                    first_num += int(text)
+                else:
+                    second_num *= 10
+                    second_num += int(text)
+            elif text == "-":
+                first_end = True
+        print(verses, first_num, second_num)
+        if second_num == 0:
+            second_num = first_num
+        for i in range(first_num, second_num+1):
+            new_slide = duplicate_slide(prs, 0)
+            new_slide.shapes[0].text = verses
+
+            text_frame = new_slide.shapes[0].text_frame
+            p = text_frame.paragraphs[0]
+            if not p.runs:
+                p.add_run()
+            p.runs[0].text = verses
+
+            text_frame = new_slide.shapes[1].text_frame
+            p = text_frame.paragraphs[0]
+            if not p.runs:
+                p.add_run()
+            num = ReadTheBible[verses_index].split(".")[0] + "."
+            out_verses = ReadTheBible[verses_index].split(".")[1]
+            p.runs[0].text = num
+            p.runs[1].text = out_verses
+            # new_slide.shapes[1].text_frame.text = ReadTheBible[verses_index]
+
+            verses_index += 1
 print()
+
 if not Promise:
     print("證道抓取失敗")
 
 else:
     print("證道:", Promise)
     title = {"headline":"", "title":[], "subtitle":{}}
+    subtitle = False
     for text in Promise:
-        for symbol in ["，", "!", "、"]:
-            if symbol in text:
-                if symbol == "，":
-                    title["headline"] = text
-                elif symbol == "、":
-                    title["title"].append(text)
+        if subtitle:
+            subtitle = False
+            title["subtitle"][title["title"][-1]][-1] += text
+        else:
+            if "，" in text or "！" in text:
+                title["headline"] = text
+            elif "、" in text:
+                title["title"].append(text)
+            elif "." in text:
+                if title["title"][-1] not in title["subtitle"]:
+                    title["subtitle"][title["title"][-1]] = []
+
+                title["subtitle"][title["title"][-1]].append(text)
+                subtitle = True
+                
+                        
     print(title)
+# for _ in range(6):
+    # remove_slide(prs,0)
+prs.save("test.pptx")
