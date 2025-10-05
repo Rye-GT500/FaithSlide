@@ -120,9 +120,9 @@ if not Promise:
 
 else:
     print("證道:", Promise)
-    title = {"headline":"", "title":[], "subtitle":[]}
+    title = {"headline":"", "title":[], "subtitle":{}}
     for text in Promise:
-        for symbol in ["，", "、"]:
+        for symbol in ["，", "!", "、"]:
             if symbol in text:
                 if symbol == "，":
                     title["headline"] = text
