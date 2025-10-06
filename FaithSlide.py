@@ -19,7 +19,7 @@ def duplicate_slide(prs:Presentation, index):
             new_slide.shapes._spTree.insert_element_before(new_el, 'p:extLst')
     return new_slide
 
-def remove_slide(prs:Presentation, index):
+def remove_slide(prs:Presentation, index:int) -> None:
     xml_slides = prs.slides._sldIdLst
     slide = list(xml_slides)
     xml_slides.remove(slide[index])
