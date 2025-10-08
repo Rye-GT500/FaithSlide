@@ -47,6 +47,14 @@ def versesPPT(main_verses, verses):
     p.runs[0].text = num
     p.runs[1].text = out_verses
 
+def titlePPT(title):
+    new_slide = duplicate_slide(prs, 1)
+
+    text_frame = new_slide.shapes[1].text_frame
+    p = text_frame.paragraphs[0]
+    if not p.runs:
+        p.add_run()
+    p.runs[0].text = title
 
 # 簡稱 -> 全名
 abbr_to_full = {
@@ -126,8 +134,8 @@ number = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
 # 請改成你的 Word 路徑
 self_path = os.path.abspath(__file__)
 base_path = os.path.dirname(self_path)
-wordfile_path = os.path.join(base_path, "202501005新竹主日週報.docx")
-# wordfile_path = os.path.join(base_path, "20250928新竹主日週報.docx")
+# wordfile_path = os.path.join(base_path, "202501005新竹主日週報.docx")
+wordfile_path = os.path.join(base_path, "20250928新竹主日週報.docx")
 template_ppt_file = os.path.join(base_path, "template.pptx")
 prs = Presentation(template_ppt_file)
 doc = Document(wordfile_path)
@@ -169,33 +177,16 @@ else:
                 break
             main_book += text
         main_verses = main_verses.replace("，", " " + main_book).split()
-    print(main_verses)
     del ReadTheBible[0]
     for verses_index in range(0, len(ReadTheBible)):
         ReadTheBible[verses_index] = ReadTheBible[verses_index].replace("[", "").replace("]", ".")
     verses_index = 0
 
-    print(ReadTheBible)
+    # print(ReadTheBible)
     if not isinstance(main_verses, list):
         for verses in ReadTheBible:
             print(main_verses, verses)
             versesPPT(main_verses, verses)
-            # new_slide = duplicate_slide(prs, 0)
-
-            # text_frame = new_slide.shapes[0].text_frame
-            # p = text_frame.paragraphs[0]
-            # if not p.runs:
-            #     p.add_run()
-            # p.runs[0].text = main_verses
-
-            # text_frame = new_slide.shapes[1].text_frame
-            # p = text_frame.paragraphs[0]
-            # if not p.runs:
-            #     p.add_run()
-            # num = verses.split(".")[0] + "."
-            # out_verses = verses.split(".")[1]
-            # p.runs[0].text = num
-            # p.runs[1].text = out_verses
     else:
         for verses in main_verses:
             first_num = 0
@@ -211,30 +202,12 @@ else:
                         second_num += int(text)
                 elif text == "-":
                     first_end = True
-            print(verses, first_num, second_num)
+            # print(verses, first_num, second_num)
             if second_num == 0:
                 second_num = first_num
             for i in range(first_num, second_num+1):
-                print(verses, ReadTheBible[verses_index])
+                # print(verses, ReadTheBible[verses_index])
                 versesPPT(verses, ReadTheBible[verses_index])
-                # new_slide = duplicate_slide(prs, 0)
-                # # new_slide.shapes[0].text = verses
-
-                # text_frame = new_slide.shapes[0].text_frame
-                # p = text_frame.paragraphs[0]
-                # if not p.runs:
-                #     p.add_run()
-                # p.runs[0].text = verses
-
-                # text_frame = new_slide.shapes[1].text_frame
-                # p = text_frame.paragraphs[0]
-                # if not p.runs:
-                #     p.add_run()
-                # num = ReadTheBible[verses_index].split(".")[0] + "."
-                # out_verses = ReadTheBible[verses_index].split(".")[1]
-                # p.runs[0].text = num
-                # p.runs[1].text = out_verses
-                # # new_slide.shapes[1].text_frame.text = ReadTheBible[verses_index]
 
                 verses_index += 1
 print()
@@ -264,7 +237,11 @@ else:
                 
                         
     print(title)
+    titlePPT(title["headline"])
+    new_slide = duplicate_slide(prs, 2)
+    
 for _ in range(6):
     remove_slide(prs,0)
+
 save_path = os.path.join(base_path, "test.pptx")
 prs.save(save_path)
