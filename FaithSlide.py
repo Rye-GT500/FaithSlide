@@ -24,6 +24,29 @@ def remove_slide(prs:Presentation, index:int) -> None:
     slide = list(xml_slides)
     xml_slides.remove(slide[index])
 
+def versesPPT(main_verses, verses):
+    new_slide = duplicate_slide(prs, 0)
+
+    text_frame = new_slide.shapes[0].text_frame
+    p = text_frame.paragraphs[0]
+    if not p.runs:
+        p.add_run()
+    p.runs[0].text = main_verses
+    for i in range(1, 3):
+        if p.runs[i].text:
+            p.runs[i].text = ""
+        else:
+            break
+
+    text_frame = new_slide.shapes[1].text_frame
+    p = text_frame.paragraphs[0]
+    if not p.runs:
+        p.add_run()
+    num = verses.split(".")[0] + "."
+    out_verses = verses.split(".")[1]
+    p.runs[0].text = num
+    p.runs[1].text = out_verses
+
 
 # 簡稱 -> 全名
 abbr_to_full = {
@@ -155,26 +178,24 @@ else:
     print(ReadTheBible)
     if not isinstance(main_verses, list):
         for verses in ReadTheBible:
-            new_slide = duplicate_slide(prs, 0)
-            # new_slide.shapes[0].text = verses
+            print(main_verses, verses)
+            versesPPT(main_verses, verses)
+            # new_slide = duplicate_slide(prs, 0)
 
-            text_frame = new_slide.shapes[0].text_frame
-            p = text_frame.paragraphs[0]
-            if not p.runs:
-                p.add_run()
-            p.runs[0].text = main_verses
+            # text_frame = new_slide.shapes[0].text_frame
+            # p = text_frame.paragraphs[0]
+            # if not p.runs:
+            #     p.add_run()
+            # p.runs[0].text = main_verses
 
-            text_frame = new_slide.shapes[1].text_frame
-            p = text_frame.paragraphs[0]
-            if not p.runs:
-                p.add_run()
-            num = verses.split(".")[0] + "."
-            out_verses = verses.split(".")[1]
-            p.runs[0].text = num
-            p.runs[1].text = out_verses
-            # new_slide.shapes[1].text_frame.text = ReadTheBible[verses_index]
-
-            verses_index += 1
+            # text_frame = new_slide.shapes[1].text_frame
+            # p = text_frame.paragraphs[0]
+            # if not p.runs:
+            #     p.add_run()
+            # num = verses.split(".")[0] + "."
+            # out_verses = verses.split(".")[1]
+            # p.runs[0].text = num
+            # p.runs[1].text = out_verses
     else:
         for verses in main_verses:
             first_num = 0
@@ -194,24 +215,26 @@ else:
             if second_num == 0:
                 second_num = first_num
             for i in range(first_num, second_num+1):
-                new_slide = duplicate_slide(prs, 0)
-                # new_slide.shapes[0].text = verses
+                print(verses, ReadTheBible[verses_index])
+                versesPPT(verses, ReadTheBible[verses_index])
+                # new_slide = duplicate_slide(prs, 0)
+                # # new_slide.shapes[0].text = verses
 
-                text_frame = new_slide.shapes[0].text_frame
-                p = text_frame.paragraphs[0]
-                if not p.runs:
-                    p.add_run()
-                p.runs[0].text = verses
+                # text_frame = new_slide.shapes[0].text_frame
+                # p = text_frame.paragraphs[0]
+                # if not p.runs:
+                #     p.add_run()
+                # p.runs[0].text = verses
 
-                text_frame = new_slide.shapes[1].text_frame
-                p = text_frame.paragraphs[0]
-                if not p.runs:
-                    p.add_run()
-                num = ReadTheBible[verses_index].split(".")[0] + "."
-                out_verses = ReadTheBible[verses_index].split(".")[1]
-                p.runs[0].text = num
-                p.runs[1].text = out_verses
-                # new_slide.shapes[1].text_frame.text = ReadTheBible[verses_index]
+                # text_frame = new_slide.shapes[1].text_frame
+                # p = text_frame.paragraphs[0]
+                # if not p.runs:
+                #     p.add_run()
+                # num = ReadTheBible[verses_index].split(".")[0] + "."
+                # out_verses = ReadTheBible[verses_index].split(".")[1]
+                # p.runs[0].text = num
+                # p.runs[1].text = out_verses
+                # # new_slide.shapes[1].text_frame.text = ReadTheBible[verses_index]
 
                 verses_index += 1
 print()
@@ -243,4 +266,5 @@ else:
     print(title)
 for _ in range(6):
     remove_slide(prs,0)
-prs.save("test.pptx")
+save_path = os.path.join(base_path, "test.pptx")
+prs.save(save_path)
