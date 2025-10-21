@@ -107,7 +107,8 @@ def init_driver():
         # print("✅ Selenium 已預載完成！")
     except Exception as e:
         messagebox.showwarning("⚠️ 初始化 Selenium 失敗：", e)
-        logging.error("⚠️ 初始化 Selenium 失敗：", e)
+        logging.error(f"⚠️ 初始化 Selenium 失敗：{e}")
+
 
 # -----------------------------------------
 # Selenium 操作區
@@ -120,7 +121,7 @@ def tap_button(driver, button):
         pass
     except Exception:
         messagebox.showwarning("點擊錯誤")
-        logging.error("點擊錯誤：", button)
+        logging.error(f"點擊錯誤：{button}")
 
 
 def Dropdown(driver, by, name, value, old):
@@ -203,10 +204,13 @@ def run_search():
                 else:
                     messagebox.showwarning("輸入錯誤", "節數錯誤")
                     logging.warning("抓取經文失敗: 節數超出範圍")
+            logging.info(f"成功抓取 {abbr_to_full[book_abbr]} 第 {chapter} 章 {start}-{end} 節")
         else:
             v= int(verse)
             if 1 <= v <= len(verses):
                 text_box.insert(tk.END, verses[v-1] + "\n")
+                logging.info(f"成功抓取 {abbr_to_full[book_abbr]} 第 {chapter} 章")
+
             else:
                 messagebox.showwarning("輸入錯誤", "節數錯誤")
                 logging.warning("抓取經文失敗: 節數超出範圍")
@@ -214,6 +218,8 @@ def run_search():
         if verses:
             for v in verses:
                 text_box.insert(tk.END, v + "\n")
+                logging.info(f"成功抓取 {abbr_to_full[book_abbr]} 第 {chapter} 章")
+
         else:
             text_box.insert(tk.END, "未抓取到經文，請檢查網頁或選擇。")
             logging.error("網頁未回應")
