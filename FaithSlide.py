@@ -239,7 +239,7 @@ else:
     print(title)
     titlePPT(title["headline"])
     new_slide = duplicate_slide(prs, 2)
-    
+
 for _ in range(6):
     remove_slide(prs,0)
 
