@@ -5,13 +5,18 @@ from threading import Thread
 from selenium import webdriver
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.service import Service
 import tkinter as tk
 from tkinter import ttk, messagebox
 import logging
 import os
+import sys
 
-self_path = os.path.abspath(__file__)
-base_path = os.path.dirname(self_path)
+if getattr(sys, 'frozen', False):
+    base_path = sys._MEIPASS
+else:
+    base_path = os.path.dirname(os.path.abspath(__file__))
+
 log_path = os.path.join(base_path, "bible_query.log")
 
 logging.basicConfig(
@@ -99,7 +104,11 @@ def init_driver():
         option = webdriver.ChromeOptions()
         option.add_argument('--headless')
         option.add_experimental_option('excludeSwitches', ['enable-automation'])
-        driver = webdriver.Chrome(options=option)
+        if getattr(sys, 'frozen', False):
+            driver_path = os.path.join(sys._MEIPASS, "chromedriver.exe")
+            driver = webdriver.Chrome(service=Service(driver_path), options=option)
+        else:
+            driver = webdriver.Chrome(options=option)
         driver.get(url)
         driver.implicitly_wait(8)
         sleep(0.5)
@@ -123,7 +132,6 @@ def tap_button(driver, button):
         messagebox.showwarning("點擊錯誤")
         logging.error(f"點擊錯誤：{button}")
 
-
 def Dropdown(driver, by, name, value, old):
     try:
         select_element = driver.find_elements(by, name)
@@ -138,8 +146,10 @@ def Dropdown(driver, by, name, value, old):
 def get_verses(book_abbr, chapter, old):
     Dropdown(driver, "name", "chineses", book_abbr, old)
     Dropdown(driver, "name", "chap", chapter, old)
-    tap_button(driver, "#content > div > form:nth-child(10) > input[type=submit]:nth-child(19)")
-
+    if old:
+        tap_button(driver, "#content > div > form:nth-child(10) > input[type=submit]:nth-child(19)")
+    else:
+        tap_button(driver, "#content > div > form:nth-child(13) > input[type=submit]:nth-child(15)")
     sleep(1)
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     verses = []
