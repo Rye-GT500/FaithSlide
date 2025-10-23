@@ -24,7 +24,7 @@ def remove_slide(prs:Presentation, index:int) -> None:
     slide = list(xml_slides)
     xml_slides.remove(slide[index])
 
-def versesPPT(main_verses, verses):
+def verses_PPT(main_verses, verses):
     new_slide = duplicate_slide(prs, 0)
 
     text_frame = new_slide.shapes[0].text_frame
@@ -47,7 +47,7 @@ def versesPPT(main_verses, verses):
     p.runs[0].text = num
     p.runs[1].text = out_verses
 
-def titlePPT(title):
+def main_title_PPT(title):
     new_slide = duplicate_slide(prs, 1)
 
     text_frame = new_slide.shapes[1].text_frame
@@ -55,7 +55,51 @@ def titlePPT(title):
     if not p.runs:
         p.add_run()
     p.runs[0].text = title
+    new_slide = duplicate_slide(prs, 2)
 
+def major_heading_PPT(major):
+    new_slide = duplicate_slide(prs, 3)
+
+    text_frame = new_slide.shapes[0].text_frame
+    p = text_frame.paragraphs[0]
+    if not p.runs:
+        p.add_run()
+    p.runs[0].text = major.split("、")[0] + "、"
+    p.runs[1].text = major.split("、")[1]
+
+def medium_hearding_PPT(major, medium):
+    new_slide = duplicate_slide(prs, 4)
+
+    text_frame = new_slide.shapes[0].text_frame
+    p = text_frame.paragraphs[0]
+    if not p.runs:
+        p.add_run()
+    p.runs[0].text = major.split("、")[0] + "、"
+    p.runs[1].text = major.split("、")[1]
+
+    text_frame = new_slide.shapes[1].text_frame
+    p = text_frame.paragraphs[0]
+    if not p.runs:
+        p.add_run()
+    p.runs[0].text = medium.split(".")[0] + "."
+    p.runs[1].text = medium.split(".")[1]
+
+def minor_heading_PPT(minor):
+    pass
+
+def paragraph_PPT(heading, heading_livel, verses):
+    if heading_livel == 1:
+        major_heading_PPT(heading["major"])
+        # for verse in verses[0]:
+        #     pass # 經文取得
+            # verses_PPT(verse)
+    elif heading_livel == 2:
+        major_heading_PPT(heading["major"])
+        for medium in heading["medium"]:
+            medium_hearding_PPT(heading["major"], medium)
+    # elif heading_livel == 3: #確認模板
+    #     for minor in heading["minor"]:
+    #         minor_heading_PPT(minor)
 # 簡稱 -> 全名
 abbr_to_full = {
     "創": "創世記",
@@ -186,7 +230,7 @@ else:
     if not isinstance(main_verses, list):
         for verses in ReadTheBible:
             print(main_verses, verses)
-            versesPPT(main_verses, verses)
+            verses_PPT(main_verses, verses)
     else:
         for verses in main_verses:
             first_num = 0
@@ -207,7 +251,7 @@ else:
                 second_num = first_num
             for i in range(first_num, second_num+1):
                 # print(verses, ReadTheBible[verses_index])
-                versesPPT(verses, ReadTheBible[verses_index])
+                verses_PPT(verses, ReadTheBible[verses_index])
 
                 verses_index += 1
 print()
@@ -216,40 +260,40 @@ if not Promise:
 
 else:
     print("證道:", Promise)
-    make_title = False
-    title = {"headline": "", "title": [], "subtitle": {}}
+    make_main_title = False
+    heading = {"major": "", "medium": [], "minor": {}}
     verses = [[], [], []]  # 大標題，主標題，副標題 經文
     subtitle = False
     heading_livel = 0
     for text in Promise:
         if subtitle: # 如果上一行是副標題的編號，表示這行是副標題內容
             subtitle = False
-            title["title"][-1] += text
+            heading["medium"][-1] += text
         else:
-            if not make_title: # 大標題
-                titlePPT(text)
-                new_slide = duplicate_slide(prs, 2)
-                make_title = True
+            if not make_main_title: # 大標題
+                main_title_PPT(text)
+                make_main_title = True
             else:
                 if "、" in text: # 主標題
                     if heading_livel != 0:# 已有完整段落，製作PPT
-                        print(title, heading_livel, verses)
-                        title = {"headline": "", "title": [], "subtitle": {}}
+                        print(heading, heading_livel, verses)
+                        paragraph_PPT(heading, heading_livel, verses)
+                        heading = {"major": "", "medium": [], "minor": {}}
                         verses = [[], [], []]  # 大標題，主標題，副標題 經文
 
                     heading_livel = 1
-                    title["headline"] = text
+                    heading["major"] = text
                 elif "." in text: # 副標題
-                    if title["headline"] == "":
+                    if heading["major"] == "":
                         print("副標題出現於主標題之前，格式錯誤")
                     else:  
-                        title["title"].append(text)
+                        heading["medium"].append(text)
                         subtitle = True
                         heading_livel = 2
 
                 elif ")" in text:  # 小標題
                     heading_livel = 3
-                    if len(title["title"]) == 0:
+                    if len(heading["medium"]) == 0:
                         print("小標題出現於副標題之前，格式錯誤")
 
                 else:
@@ -261,7 +305,8 @@ else:
                         if text in abbr_to_full.keys() or text in abbr_to_full.values():
                             verses[heading_livel -1].append(text)
 
-    print(title, heading_livel, verses)
+    print(heading, heading_livel, verses)
+    paragraph_PPT(heading, heading_livel, verses)
     
                 
                         
