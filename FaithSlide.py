@@ -211,35 +211,60 @@ else:
 
                 verses_index += 1
 print()
-
 if not Promise:
     print("證道抓取失敗")
 
 else:
     print("證道:", Promise)
-    title = {"headline":"", "title":[], "subtitle":{}}
+    make_title = False
+    title = {"headline": "", "title": [], "subtitle": {}}
+    verses = [[], [], []]  # 大標題，主標題，副標題 經文
     subtitle = False
+    heading_livel = 0
     for text in Promise:
-        if subtitle:
+        if subtitle: # 如果上一行是副標題的編號，表示這行是副標題內容
             subtitle = False
-            title["subtitle"][title["title"][-1]][-1] += text
+            title["title"][-1] += text
         else:
-            if "，" in text or "！" in text:
-                title["headline"] = text
-            elif "、" in text:
-                title["title"].append(text)
-            elif "." in text:
-                if title["title"][-1] not in title["subtitle"]:
-                    title["subtitle"][title["title"][-1]] = []
+            if not make_title: # 大標題
+                titlePPT(text)
+                new_slide = duplicate_slide(prs, 2)
+                make_title = True
+            else:
+                if "、" in text: # 主標題
+                    if heading_livel != 0:# 已有完整段落，製作PPT
+                        print(title, heading_livel, verses)
+                        title = {"headline": "", "title": [], "subtitle": {}}
+                        verses = [[], [], []]  # 大標題，主標題，副標題 經文
 
-                title["subtitle"][title["title"][-1]].append(text)
-                subtitle = True
+                    heading_livel = 1
+                    title["headline"] = text
+                elif "." in text: # 副標題
+                    if title["headline"] == "":
+                        print("副標題出現於主標題之前，格式錯誤")
+                    else:  
+                        title["title"].append(text)
+                        subtitle = True
+                        heading_livel = 2
+
+                elif ")" in text:  # 小標題
+                    heading_livel = 3
+                    if len(title["title"]) == 0:
+                        print("小標題出現於副標題之前，格式錯誤")
+
+                else:
+                    for t in text:
+                        if t in number:
+                            verses[heading_livel -1].append(text)
+                            break
+                    else:
+                        if text in abbr_to_full.keys() or text in abbr_to_full.values():
+                            verses[heading_livel -1].append(text)
+
+    print(title, heading_livel, verses)
+    
                 
                         
-    print(title)
-    titlePPT(title["headline"])
-    new_slide = duplicate_slide(prs, 2)
-
 for _ in range(6):
     remove_slide(prs,0)
 
