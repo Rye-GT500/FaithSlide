@@ -3,7 +3,92 @@ from pptx import Presentation
 from pptx.util import Inches
 import copy
 import os
+from BibleDictionary import old_testament_books
+from threading import Thread
+import logging
+from selenium import webdriver
+from selenium.webdriver.support.ui import Select
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.service import Service
+from bs4 import BeautifulSoup
+from time import sleep
+import sys
+from random import uniform
 # FaithSlide.py
+
+url = "https://bible.fhl.net/index.html"
+driver = None
+driver_ready = False  # 是否完成初始化
+
+def init_driver():
+    global driver, driver_ready
+    try:
+        option = webdriver.ChromeOptions()
+        option.add_argument('--headless')
+        option.add_experimental_option('excludeSwitches', ['enable-automation'])
+        if getattr(sys, 'frozen', False):
+            driver_path = os.path.join(sys._MEIPASS, "chromedriver.exe")
+            driver = webdriver.Chrome(service=Service(driver_path), options=option)
+        else:
+            driver = webdriver.Chrome(options=option)
+        driver.get(url)
+        driver.implicitly_wait(8)
+        sleep(0.5)
+        driver_ready = True
+        # print("✅ Selenium 已預載完成！")
+    except Exception as e:
+        # messagebox.showwarning("⚠️ 初始化 Selenium 失敗：", e)
+        logging.error(f"⚠️ 初始化 Selenium 失敗：{e}")
+
+def tap_button(driver, button):
+    try:
+        tap = driver.find_element('css selector', button)
+        driver.execute_script('arguments[0].click();', tap)
+    except TimeoutException:
+        pass
+    except Exception:
+        # messagebox.showwarning("點擊錯誤")
+        logging.error(f"點擊錯誤：{button}")
+
+def Dropdown(driver, by, name, value, old):
+    try:
+        select_element = driver.find_elements(by, name)
+        BookDropdown = Select(select_element[0 if old else 1])
+        BookDropdown.select_by_value(value)
+        sleep(uniform(0.1, 0.2))
+    except Exception:
+        # messagebox.showwarning(f"搜尋不到下拉選單 {name}")
+        logging.error(f"搜尋不到下拉選單 {name}")
+
+def get_verses(book_abbr, chapter, old):
+    Dropdown(driver, "name", "chineses", book_abbr, old)
+    Dropdown(driver, "name", "chap", chapter, old)
+    if old:
+        tap_button(driver, "#content > div > form:nth-child(10) > input[type=submit]:nth-child(19)")
+    else:
+        tap_button(driver, "#content > div > form:nth-child(13) > input[type=submit]:nth-child(15)")
+    sleep(1)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    verses = []
+    all_Verse = soup.find_all("tr")
+
+    for i in all_Verse:
+        try:
+            td = i.find_all("td")
+            if len(td) >= 2:
+                VerseNumber = td[0].text
+                if ":" in VerseNumber:
+                    VerseNumber = VerseNumber.split(":")[1]
+                    verses.append(f"{VerseNumber}. {td[1].text.strip()}")
+        except Exception as e:
+            # messagebox.showwarning(f"抓取經文錯誤: {e}")
+            logging.error(f"抓取經文錯誤: {e}")
+
+    driver.get(url)
+    driver.implicitly_wait(8)
+    sleep(0.3)
+
+    return verses
 
 def duplicate_slide(prs:Presentation, index):
     template_slide = prs.slides[index]
@@ -24,14 +109,14 @@ def remove_slide(prs:Presentation, index:int) -> None:
     slide = list(xml_slides)
     xml_slides.remove(slide[index])
 
-def verses_PPT(main_verses, verses):
+def verses_PPT(title, verses):
     new_slide = duplicate_slide(prs, 0)
 
     text_frame = new_slide.shapes[0].text_frame
     p = text_frame.paragraphs[0]
     if not p.runs:
         p.add_run()
-    p.runs[0].text = main_verses
+    p.runs[0].text = title
     for i in range(1, 3):
         if p.runs[i].text:
             p.runs[i].text = ""
@@ -95,6 +180,60 @@ def medium_hearding_PPT(major, medium, medium_list):
 def minor_heading_PPT(minor):
     pass
 
+def parse_bible_reference(bible):
+    book = ""
+    chapter_and_verse = ""
+    # print(bible)
+    for char in bible:
+        print(char, "char")
+        if char[0] in number:
+            chapter_and_verse += char
+            if book == "":
+                book = main_book
+            
+            if book in old_testament_books:
+                old = True
+            else:
+                old = False
+            
+            while not driver_ready:
+                sleep(0.5)
+
+            verses = get_verses(book, chapter_and_verse.split(":")[0], old)            
+
+            title = f"{abbr_to_full[book]}"
+            for ch in chapter_and_verse.split(":")[0:1]:
+                chinese_chapter = ""
+                for c in ch:
+                    if c in number:
+                        if chinese_chapter == "":
+                            chinese_chapter += chinese_number[int(c)-1]
+                        else:
+                            if chinese_chapter == "一":
+                                chinese_chapter = ""
+                            if "十" in chinese_chapter:
+                                chinese_chapter  = chinese_chapter.replace("十", "百")
+                            chinese_chapter += f"十{chinese_number[int(c)-1]}"
+                title += f"{chinese_chapter}章"
+                
+            
+            title += f"{chapter_and_verse.split(':')[1].replace(",", "")}節"
+            # print(title, "title")
+            start = int(chapter_and_verse.split(":")[1].split("-")[0])-1
+            try:
+                end = int(chapter_and_verse.split(":")[1].split("-")[1].replace(",",""))
+            except:
+                end = start + 1
+            for v in range(start, end):
+                verses_PPT(title, verses[v].replace(" ", ""))
+                print(verses[v].replace(" ", ""))
+            # verses_PPT
+            print()
+            book = ""
+            chapter_and_verse = ""
+        else:
+            book += char
+
 def paragraph_PPT(heading, verses):
     if heading["minor"]:
         heading_livel = 3
@@ -106,10 +245,12 @@ def paragraph_PPT(heading, verses):
     if heading_livel == 1:
         major_heading_PPT(heading["major"])
         # for verse in verses[0]:
-        #     pass # 經文取得
+        print(verses, "in paragraph_PPT")
+        parse_bible_reference(verses[0])
             # verses_PPT(verse)
     elif heading_livel == 2:
         major_heading_PPT(heading["major"])
+        parse_bible_reference(verses[0])
         for medium in heading["medium"]:
             medium_hearding_PPT(heading["major"], medium, heading["medium"])
     # elif heading_livel == 3: #確認模板
@@ -187,8 +328,24 @@ abbr_to_full = {
 
 # 全名 -> 簡稱
 full_to_abbr = {v: k for k, v in abbr_to_full.items()}
-chinese_number = {"一", "二", "三", "四", "五", "六", "七", "八", "九", "十"}
+chinese_number = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
 number = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+
+Thread(target=init_driver, daemon=True).start()
+
+if getattr(sys, 'frozen', False):
+    base_path = sys._MEIPASS
+else:
+    base_path = os.path.dirname(os.path.abspath(__file__))
+
+log_path = os.path.join(base_path, "bible_query.log")
+
+logging.basicConfig(
+    filename=log_path,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    encoding="utf-8"
+)
 
 # 請改成你的 Word 路徑
 self_path = os.path.abspath(__file__)
@@ -244,7 +401,7 @@ else:
     # print(ReadTheBible)
     if not isinstance(main_verses, list):
         for verses in ReadTheBible:
-            print(main_verses, verses)
+            print(verses)
             verses_PPT(main_verses, verses)
     else:
         for verses in main_verses:
@@ -269,7 +426,15 @@ else:
                 verses_PPT(verses, ReadTheBible[verses_index])
 
                 verses_index += 1
+
 print()
+
+for book in full_to_abbr.keys():
+    if book in main_verses:
+        main_book = full_to_abbr[book]
+        break
+print("main book", main_book)
+
 if not Promise:
     print("證道抓取失敗")
 

@@ -286,5 +286,6 @@ for i in range(5):
 frame.grid_columnconfigure(0, weight=1)
 frame.grid_columnconfigure(1, weight=1)
 
-Thread(target=init_driver, daemon=True).start()
-root.mainloop()
+if __name__ == "__main__":
+    Thread(target=init_driver, daemon=True).start()
+    root.mainloop()
