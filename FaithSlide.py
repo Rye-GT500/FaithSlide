@@ -110,7 +110,13 @@ def remove_slide(prs:Presentation, index:int) -> None:
     xml_slides.remove(slide[index])
 
 def verses_PPT(title, verses):
-    new_slide = duplicate_slide(prs, 0)
+    num = verses.split(".")[0] + "."
+    out_verses = verses.split(".")[1]
+
+    if len(num) == 2:
+        new_slide = duplicate_slide(prs, 5)
+    else:
+        new_slide = duplicate_slide(prs, 0)
 
     text_frame = new_slide.shapes[0].text_frame
     p = text_frame.paragraphs[0]
@@ -118,17 +124,16 @@ def verses_PPT(title, verses):
         p.add_run()
     p.runs[0].text = title
     for i in range(1, 3):
-        if p.runs[i].text:
+        try:
             p.runs[i].text = ""
-        else:
+        except:
             break
 
     text_frame = new_slide.shapes[1].text_frame
     p = text_frame.paragraphs[0]
     if not p.runs:
         p.add_run()
-    num = verses.split(".")[0] + "."
-    out_verses = verses.split(".")[1]
+    
     p.runs[0].text = num
     p.runs[1].text = out_verses
 
@@ -176,7 +181,6 @@ def medium_hearding_PPT(major, medium, medium_list):
         p.add_run()
         p.add_run()
 
-
 def minor_heading_PPT(minor):
     pass
 
@@ -201,6 +205,17 @@ def num_to_chinese(title, chapter_and_verse: str) -> str:
     title += f"{chinese_chapter}章"
     return title
 
+def analyze_paragraph(title, verse_analyze, verses):
+    start = int(verse_analyze.split("-")[0])-1
+    try:
+        end = int(verse_analyze.split("-")[1].replace(",",""))
+    except:
+        end = start + 1
+    for v in range(start, end):
+        verses_PPT(title, verses[v].replace(" ", ""))
+        verse = verses[v].replace(" ", "")
+        logging.info(f"{title} {verse}")
+
 def parse_bible_reference(bible):
     book = ""
     chapter_and_verse = ""
@@ -219,25 +234,23 @@ def parse_bible_reference(bible):
             while not driver_ready:
                 sleep(0.5)
 
-            verses = get_verses(book, chapter_and_verse.split(":")[0], old)            
+            scrape_verses = get_verses(book, chapter_and_verse.split(":")[0], old)     
 
             title = f"{abbr_to_full[book]}"
             title = num_to_chinese(title, chapter_and_verse)
-                
-            verse = chapter_and_verse.split(':')[1].replace(",", "")
-            title += f"{verse}節"
-            # print(title, "title")
-            start = int(chapter_and_verse.split(":")[1].split("-")[0])-1
-            try:
-                end = int(chapter_and_verse.split(":")[1].split("-")[1].replace(",",""))
-            except:
-                end = start + 1
-            for v in range(start, end):
-                verses_PPT(title, verses[v].replace(" ", ""))
-                verse = verses[v].replace(" ", "")
-                logging.info(f"{title} {verse}")
-            # verses_PPT
-            # print()
+            verse = chapter_and_verse.split(':')[1]
+            if "," in verse:
+                verse = verse.split(",")
+            
+            if isinstance(verse, list):
+                for v in verse:
+                    analyze_paragraph(title+f"{v}節", v, scrape_verses)
+            else:
+                title += f"{verse}節"
+                analyze_paragraph(title, verse, scrape_verses)
+            # print(chapter_and_verse)
+            
+
             book = ""
             chapter_and_verse = ""
         else:
@@ -250,7 +263,7 @@ def paragraph_PPT(heading, verses):
         heading_livel = 2
     else:
         heading_livel = 1
-
+    logging.info(verses)
     if heading_livel == 1:
         major_heading_PPT(heading["major"])
         # for verse in verses[0]:
@@ -348,7 +361,7 @@ if getattr(sys, 'frozen', False):
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 
-log_path = os.path.join(base_path, "bible_query.log")
+log_path = os.path.join(base_path, "FaithSlide.log")
 
 logging.basicConfig(
     filename=log_path,
@@ -360,9 +373,8 @@ logging.basicConfig(
 # 請改成你的 Word 路徑
 self_path = os.path.abspath(__file__)
 base_path = os.path.dirname(self_path)
-# wordfile_path = os.path.join(base_path, "202501005新竹主日週報.docx")
-wordfile_path = os.path.join(base_path, "20250928新竹主日週報.docx")
-# wordfile_path = os.path.join(base_path, "20251026新竹主日週報.docx")
+wordfile_path = os.path.join(base_path, "202501005新竹主日週報.docx")
+# wordfile_path = os.path.join(base_path, "20250928新竹主日週報.docx")
 template_ppt_file = os.path.join(base_path, "template.pptx")
 prs = Presentation(template_ppt_file)
 doc = Document(wordfile_path)
@@ -392,9 +404,9 @@ for t_idx, table in enumerate(doc.tables):
             Promise = bold_texts[1:]
 
 if not ReadTheBible:
-    print("讀經抓取失敗")
+    logging.warning("讀經抓取失敗")
 else:
-    print("讀經:")
+    logging.info("讀經:")
     main_verses = ReadTheBible[0]
     
     if "，" in main_verses:
@@ -409,10 +421,10 @@ else:
         ReadTheBible[verses_index] = ReadTheBible[verses_index].replace("[", "").replace("]", ".")
     verses_index = 0
 
-    # print(ReadTheBible)
+    logging.info(ReadTheBible)
     if not isinstance(main_verses, list):
         for verses in ReadTheBible:
-            print(verses)
+            logging.info(verses)
             verses_PPT(main_verses, verses)
     else:
         for verses in main_verses:
@@ -433,23 +445,20 @@ else:
             if second_num == 0:
                 second_num = first_num
             for i in range(first_num, second_num+1):
-                print(verses, ReadTheBible[verses_index])
+                logging.info(f"{verses}, {ReadTheBible[verses_index]}")
                 verses_PPT(verses, ReadTheBible[verses_index])
 
                 verses_index += 1
 
-print()
 
 for book in full_to_abbr.keys():
     if isinstance(main_verses, list):
         if book in main_verses[0]:
             main_book = full_to_abbr[book]
-            print(main_book)
             break
     else:
         if book in main_verses:
             main_book = full_to_abbr[book]
-            print(main_book)
             break
 
 logging.info(f"main book {main_book}")
@@ -459,6 +468,7 @@ if not Promise:
 
 else:
     logging.info(f"證道:{Promise}")
+    print(f"證道:{Promise}")
     make_main_title = False
     heading = {"major": "", "medium": [], "minor": {}}
     verses = [[], {}, []]  # 大標題，主標題，副標題 經文
@@ -533,3 +543,4 @@ for _ in range(6):
 save_path = os.path.join(base_path, "test.pptx")
 prs.save(save_path)
 print("製作完成")
+driver.quit()
