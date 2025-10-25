@@ -180,12 +180,32 @@ def medium_hearding_PPT(major, medium, medium_list):
 def minor_heading_PPT(minor):
     pass
 
+def num_to_chinese(title, chapter_and_verse: str) -> str:
+    chapter = chapter_and_verse.split(":")[0]
+    chinese_chapter = ""
+    # print(chapter)
+    if len(chapter) == 3:
+        chinese_chapter += f"{chinese_number[int(chapter[0])]}百"
+        chinese_chapter += f"{chinese_number[int(chapter[1])]}"
+        if chinese_chapter[-1] != "零":
+            chinese_chapter += "十"
+        chinese_chapter += f"{chinese_number[int(chapter[2])]}"
+    elif len(chapter) == 2:
+        chinese_chapter += f"{chinese_number[int(chapter[0])]}"
+        if chinese_chapter == "一":
+            chinese_chapter = ""
+        chinese_chapter += f"十{chinese_number[int(chapter[1])]}"
+    elif len(chapter) == 1:
+        chinese_chapter = f"{chinese_number[int(chapter[0])]}"
+
+    title += f"{chinese_chapter}章"
+    return title
+
 def parse_bible_reference(bible):
     book = ""
     chapter_and_verse = ""
     # print(bible)
     for char in bible:
-        print(char, "char")
         if char[0] in number:
             chapter_and_verse += char
             if book == "":
@@ -202,22 +222,10 @@ def parse_bible_reference(bible):
             verses = get_verses(book, chapter_and_verse.split(":")[0], old)            
 
             title = f"{abbr_to_full[book]}"
-            for ch in chapter_and_verse.split(":")[0:1]:
-                chinese_chapter = ""
-                for c in ch:
-                    if c in number:
-                        if chinese_chapter == "":
-                            chinese_chapter += chinese_number[int(c)-1]
-                        else:
-                            if chinese_chapter == "一":
-                                chinese_chapter = ""
-                            if "十" in chinese_chapter:
-                                chinese_chapter  = chinese_chapter.replace("十", "百")
-                            chinese_chapter += f"十{chinese_number[int(c)-1]}"
-                title += f"{chinese_chapter}章"
+            title = num_to_chinese(title, chapter_and_verse)
                 
-            
-            title += f"{chapter_and_verse.split(':')[1].replace(",", "")}節"
+            verse = chapter_and_verse.split(':')[1].replace(",", "")
+            title += f"{verse}節"
             # print(title, "title")
             start = int(chapter_and_verse.split(":")[1].split("-")[0])-1
             try:
@@ -226,9 +234,10 @@ def parse_bible_reference(bible):
                 end = start + 1
             for v in range(start, end):
                 verses_PPT(title, verses[v].replace(" ", ""))
-                print(verses[v].replace(" ", ""))
+                verse = verses[v].replace(" ", "")
+                logging.info(f"{title} {verse}")
             # verses_PPT
-            print()
+            # print()
             book = ""
             chapter_and_verse = ""
         else:
@@ -245,7 +254,7 @@ def paragraph_PPT(heading, verses):
     if heading_livel == 1:
         major_heading_PPT(heading["major"])
         # for verse in verses[0]:
-        print(verses, "in paragraph_PPT")
+        # print(verses, "in paragraph_PPT")
         parse_bible_reference(verses[0])
             # verses_PPT(verse)
     elif heading_livel == 2:
@@ -253,6 +262,7 @@ def paragraph_PPT(heading, verses):
         parse_bible_reference(verses[0])
         for medium in heading["medium"]:
             medium_hearding_PPT(heading["major"], medium, heading["medium"])
+            parse_bible_reference(verses[1][medium])
     # elif heading_livel == 3: #確認模板
     #     for minor in heading["minor"]:
     #         minor_heading_PPT(minor)
@@ -328,7 +338,7 @@ abbr_to_full = {
 
 # 全名 -> 簡稱
 full_to_abbr = {v: k for k, v in abbr_to_full.items()}
-chinese_number = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
+chinese_number = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
 number = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
 
 Thread(target=init_driver, daemon=True).start()
@@ -352,6 +362,7 @@ self_path = os.path.abspath(__file__)
 base_path = os.path.dirname(self_path)
 # wordfile_path = os.path.join(base_path, "202501005新竹主日週報.docx")
 wordfile_path = os.path.join(base_path, "20250928新竹主日週報.docx")
+# wordfile_path = os.path.join(base_path, "20251026新竹主日週報.docx")
 template_ppt_file = os.path.join(base_path, "template.pptx")
 prs = Presentation(template_ppt_file)
 doc = Document(wordfile_path)
@@ -422,7 +433,7 @@ else:
             if second_num == 0:
                 second_num = first_num
             for i in range(first_num, second_num+1):
-                # print(verses, ReadTheBible[verses_index])
+                print(verses, ReadTheBible[verses_index])
                 verses_PPT(verses, ReadTheBible[verses_index])
 
                 verses_index += 1
@@ -430,16 +441,24 @@ else:
 print()
 
 for book in full_to_abbr.keys():
-    if book in main_verses:
-        main_book = full_to_abbr[book]
-        break
-print("main book", main_book)
+    if isinstance(main_verses, list):
+        if book in main_verses[0]:
+            main_book = full_to_abbr[book]
+            print(main_book)
+            break
+    else:
+        if book in main_verses:
+            main_book = full_to_abbr[book]
+            print(main_book)
+            break
+
+logging.info(f"main book {main_book}")
 
 if not Promise:
-    print("證道抓取失敗")
+    logging.warning("證道抓取失敗")
 
 else:
-    print("證道:", Promise)
+    logging.info(f"證道:{Promise}")
     make_main_title = False
     heading = {"major": "", "medium": [], "minor": {}}
     verses = [[], {}, []]  # 大標題，主標題，副標題 經文
@@ -461,7 +480,7 @@ else:
             else:
                 if "、" in text: # 主標題
                     if heading_livel != 0:# 已有完整段落，製作PPT
-                        print(heading, heading_livel, verses)
+                        logging.info(f"{heading}, {heading_livel}, {verses}")
                         paragraph_PPT(heading, verses)
                         heading = {"major": "", "medium": [], "minor": {}}
                         verses = [[], {}, []]  # 大標題，主標題，副標題 經文
@@ -470,7 +489,7 @@ else:
                     heading["major"] = text
                 elif "." in text: # 副標題
                     if heading["major"] == "":
-                        print("副標題出現於主標題之前，格式錯誤")
+                        logging.info("副標題出現於主標題之前，格式錯誤")
                     else:  
                         heading["medium"].append(text)
                         
@@ -480,7 +499,7 @@ else:
                 elif ")" in text:  # 小標題，待測試
                     heading_livel = 3
                     if len(heading["medium"]) == 0:
-                        print("小標題出現於副標題之前，格式錯誤")
+                        logging.info("小標題出現於副標題之前，格式錯誤")
                     if heading["medium"][-1] not in heading["minor"].keys():
                         heading["minor"][heading["medium"][-1]] = []
                     heading["minor"][heading["medium"][-1]].append(text)
@@ -503,7 +522,7 @@ else:
                                 verses[1][heading["medium"][-1]] = []
                             verses[1][heading["medium"][-1]].append(text)
 
-    print(heading, heading_livel, verses)
+    logging.info(f"{heading}, {heading_livel}, {verses}")
     paragraph_PPT(heading, verses)
     
                 
@@ -513,3 +532,4 @@ for _ in range(6):
 
 save_path = os.path.join(base_path, "test.pptx")
 prs.save(save_path)
+print("製作完成")
