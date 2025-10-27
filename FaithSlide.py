@@ -110,6 +110,9 @@ def remove_slide(prs:Presentation, index:int) -> None:
     xml_slides.remove(slide[index])
 
 def verses_PPT(title, verses):
+    if "." not in verses:
+        logging.warning(f"經文格式錯誤，無法製作投影片: {title} {verses}")
+        return
     num = verses.split(".")[0] + "."
     out_verses = verses.split(".")[1]
 
@@ -251,8 +254,10 @@ def process_reference_block(chapter_and_verse, book, old):
         verse = verse.split(",")
     
     if isinstance(verse, list):
+        print(verse, "is verse list")
         for v in verse:
-            analyze_paragraph(title+f"{v}節", v, scrape_verses)
+            if v:
+                analyze_paragraph(title+f"{v}節", v, scrape_verses)
     else:
         title += f"{verse}節"
         analyze_paragraph(title, verse, scrape_verses)
@@ -280,10 +285,12 @@ def parse_bible_reference(bible):
                 # print(chapter_and_verse, "is chapter and verse")
             if isinstance(chapter_and_verse, list):
                 for cav in chapter_and_verse:
+                    print(cav, book, old)
                     process_reference_block(cav, book, old)
             else:
+                print(chapter_and_verse, book, old)
                 process_reference_block(chapter_and_verse, book, old)
-            # print(chapter_and_verse)
+                            # print(chapter_and_verse)
             
 
             book = ""
@@ -418,8 +425,8 @@ self_path = os.path.abspath(__file__)
 base_path = os.path.dirname(self_path)
 # wordfile_path = os.path.join(base_path, "202501005新竹主日週報.docx")
 # wordfile_path = os.path.join(base_path, "20251012新竹主日週報.docx")
-wordfile_path = os.path.join(base_path, "20251019新竹主日週報.docx")
-# wordfile_path = os.path.join(base_path, "20250928新竹主日週報.docx")
+# wordfile_path = os.path.join(base_path, "20251019新竹主日週報.docx")
+wordfile_path = os.path.join(base_path, "20250928新竹主日週報.docx")
 template_ppt_file = os.path.join(base_path, "template.pptx")
 prs = Presentation(template_ppt_file)
 doc = Document(wordfile_path)
@@ -445,13 +452,27 @@ for t_idx, table in enumerate(doc.tables):
                     for run in para.runs:
                         text = run.text.strip()
                         if run.bold and text:
+                            print(text, "is bold")
                             if "，" in text:
                                 text = text.split("，")
-                                for t in text:
-                                    bold_texts.append(t)
+                                print(text, "split by ，")
+                                if text[1] == "":
+                                    if text[0] == "":
+                                        bold_texts[-2] += bold_texts[-1]
+                                        bold_texts.remove(bold_texts[-1])
+                                    else:
+                                        bold_texts.append(text[0])
+                                    bold_texts.append(text[1])
+                                else:
+                                    print(text, "after split by ，")
+                                    if text[1] in abbr_to_full.keys():
+                                        bold_texts.extend(text)
+                                    else:
+                                        bold_texts.append(text[0] + "，" + text[1])
+                                        
                             elif "：" in text and "、" not in text and "." not in text and ")" not in text:
                                 text = text.split("：")
-                                # print(text, "split by ：")
+                                print(text, "split by ：")
                                 if text[1] == "":
                                     if text[0] == "":
                                         bold_texts[-2] += bold_texts[-1]
@@ -460,7 +481,11 @@ for t_idx, table in enumerate(doc.tables):
                                         bold_texts[-1] += text[0]
                                     bold_texts.append(text[1])
                                 else:
-                                    bold_texts.extend(text)
+                                    print(text, "after split by ：")
+                                    if text[1] in abbr_to_full.keys():
+                                        bold_texts.extend(text)
+                                    else:
+                                        bold_texts.append(text[0] + "：" + text[1])
                             else:
                                 bold_texts.append(text)
             Promise = bold_texts[1:]
@@ -530,7 +555,7 @@ if not Promise:
 
 else:
     logging.info(f"證道:{Promise}")
-    # print(f"證道:{Promise}")
+    print(f"證道:{Promise}")
     make_main_title = False
     heading = {"major": "", "medium": [], "minor": {}}
     verses = [[], {}, {}]  # 大標題，主標題，副標題 經文
