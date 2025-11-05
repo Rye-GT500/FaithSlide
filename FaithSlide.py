@@ -249,10 +249,11 @@ def process_reference_block(chapter_and_verse, book, old):
 
     title = f"{abbr_to_full[book]}"
     title = num_to_chinese(title, chapter_and_verse)
+    chapter_and_verse = chapter_and_verse.replace("，", "")
     verse = chapter_and_verse.split(':')[1]
     if "," in verse:
         verse = verse.split(",")
-    
+
     if isinstance(verse, list):
         print(verse, "is verse list")
         for v in verse:
@@ -266,8 +267,8 @@ def parse_bible_reference(bible):
     # print(bible)
     book = ""
     chapter_and_verse = ""
-    # print(bible)
     for char in bible:
+        # print(char)
         if char[0] in number:
             chapter_and_verse += char
             if book == "":
@@ -290,7 +291,7 @@ def parse_bible_reference(bible):
             else:
                 print(chapter_and_verse, book, old)
                 process_reference_block(chapter_and_verse, book, old)
-                            # print(chapter_and_verse)
+                # print(chapter_and_verse)
             
 
             book = ""
@@ -423,16 +424,15 @@ print(log_path, "為日誌檔案位置")
 # 請改成你的 Word 路徑
 self_path = os.path.abspath(__file__)
 base_path = os.path.dirname(self_path)
-# wordfile_path = os.path.join(base_path, "202501005新竹主日週報.docx")
-# wordfile_path = os.path.join(base_path, "20251012新竹主日週報.docx")
+wordfile_path = os.path.join(base_path, "202501005新竹主日週報.docx")
+wordfile_path = os.path.join(base_path, "20251012新竹主日週報.docx")
 # wordfile_path = os.path.join(base_path, "20251019新竹主日週報.docx")
-wordfile_path = os.path.join(base_path, "20250928新竹主日週報.docx")
+# wordfile_path = os.path.join(base_path, "20250928新竹主日週報.docx")
 template_ppt_file = os.path.join(base_path, "template.pptx")
 prs = Presentation(template_ppt_file)
 doc = Document(wordfile_path)
 ReadTheBible = []
-Promise = []
-
+sermon = []
 # 逐個表格抓文字
 for t_idx, table in enumerate(doc.tables):
     # print(f"=== 表格 {t_idx+1} ===")
@@ -446,49 +446,70 @@ for t_idx, table in enumerate(doc.tables):
             row_texts = [cell.text.strip() for cell in row.cells]
             ReadTheBible = row_texts[1].split("\n")
         elif tatil == "證道": #添加全形分割符號支援
-            bold_texts  = []
+            bold_texts  = ""
             for cell in row.cells:
                 for para in cell.paragraphs:
                     for run in para.runs:
                         text = run.text.strip()
                         if run.bold and text:
-                            print(text, "is bold")
-                            if "，" in text:
-                                text = text.split("，")
-                                print(text, "split by ，")
-                                if text[1] == "":
-                                    if text[0] == "":
-                                        bold_texts[-2] += bold_texts[-1]
-                                        bold_texts.remove(bold_texts[-1])
-                                    else:
-                                        bold_texts.append(text[0])
-                                    bold_texts.append(text[1])
-                                else:
-                                    print(text, "after split by ，")
-                                    if text[1] in abbr_to_full.keys():
-                                        bold_texts.extend(text)
-                                    else:
-                                        bold_texts.append(text[0] + "，" + text[1])
-                                        
-                            elif "：" in text and "、" not in text and "." not in text and ")" not in text:
-                                text = text.split("：")
-                                print(text, "split by ：")
-                                if text[1] == "":
-                                    if text[0] == "":
-                                        bold_texts[-2] += bold_texts[-1]
-                                        bold_texts.remove(bold_texts[-1])
-                                    else:
-                                        bold_texts[-1] += text[0]
-                                    bold_texts.append(text[1])
-                                else:
-                                    print(text, "after split by ：")
-                                    if text[1] in abbr_to_full.keys():
-                                        bold_texts.extend(text)
-                                    else:
-                                        bold_texts.append(text[0] + "：" + text[1])
+                            if bold_texts == "證道":
+                                bold_texts = text
                             else:
-                                bold_texts.append(text)
-            Promise = bold_texts[1:]
+                                if text in ["錢致榮", "牧師", "傳道", "吳佩倫"]:
+                                    if bold_texts != "":
+                                        # print("遇到講員名稱，結束證道內容擷取", bold_texts)
+                                        sermon.append(bold_texts)
+                                    bold_texts = ""
+                                    continue
+                                for symbol in ["、", ".", ")"]:
+                                    if symbol in bold_texts:
+                                        print("遇到分隔符號，結束證道內容擷取", symbol, bold_texts)
+                                        first_part = bold_texts.split(symbol)[0]
+                                        second_part = first_part[-1][-1] + symbol + bold_texts.split(symbol)[1]
+                                        first_part = first_part[:-1]
+                                        if first_part:
+                                            sermon.append(first_part)
+                                        if second_part: 
+                                            sermon.append(second_part)
+                                        bold_texts = text
+                                        break
+                                else:
+                                    for book in ["創", "出", "利", "民", "申", "書", "士", "得", "撒上", "撒下", "王上", "王下", "代上", "代下", "拉", "尼", "斯", "伯", "詩", "箴", "傳", "歌", "賽", "耶", "哀", "結", "但", "何", "珥", "摩", "俄", "拿", "彌", "鴻", "哈", "番", "該", "瑪", "亞", "太", "可", "路", "約", "徒", "羅", "林前", "林後", "加", "弗", "腓", "西", "帖前", "帖後", "提前", "提後", "多", "門", "來", "雅", "彼前", "彼後", "約壹", "約貳", "約參", "猶", "啟"]:
+                                        if book in bold_texts:
+                                            print(bold_texts.index(book)+len(book), len(bold_texts))
+                                        if book in bold_texts and (bold_texts.index(book)+len(book) == len(bold_texts) or bold_texts[bold_texts.index(book)+1] in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]):
+                                            first_part = bold_texts.split(book)[0]
+                                            bold_texts = bold_texts.replace(first_part, "")
+                                            print("遇到書卷，結束證道內容擷取", book, first_part, bold_texts)
+                                            if first_part:
+                                                sermon.append(first_part)
+                                            if bold_texts:
+                                                sermon.append(bold_texts)
+                                            bold_texts = text
+                                            break
+                                    else:
+                                        n = ""
+                                        min_num_index = len(bold_texts)
+                                        for num in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]:
+                                            if num in bold_texts:
+                                                idx = bold_texts.index(num)
+                                                if idx < min_num_index:
+                                                    min_num_index = idx
+                                                    n = num
+                                        print("最小數字索引", min_num_index, n)
+                                        if n and n in bold_texts:
+                                            print(bold_texts.split(n))
+                                            first_part = bold_texts.split(n)[0]
+                                            bold_texts = bold_texts.replace(first_part, "")
+                                            print("遇到數字，結束證道內容擷取", n, first_part)
+                                            if first_part:
+                                                sermon.append(first_part)
+                                            bold_texts += text
+
+                                        else:
+                                            bold_texts += text
+                                            continue
+sermon.append(bold_texts)
 
 if not ReadTheBible:
     logging.warning("讀經抓取失敗")
@@ -550,19 +571,19 @@ for book in full_to_abbr.keys():
 
 logging.info(f"main book {main_book}")
 
-if not Promise:
+if not sermon:
     logging.warning("證道抓取失敗")
 
 else:
-    logging.info(f"證道:{Promise}")
-    print(f"證道:{Promise}")
+    logging.info(f"證道:{sermon}")
+    print(f"證道:{sermon}")
     make_main_title = False
     heading = {"major": "", "medium": [], "minor": {}}
     verses = [[], {}, {}]  # 大標題，主標題，副標題 經文
     subtitle = False
     minor_title = False
     heading_livel = 0
-    for text in Promise:
+    for text in sermon:
         if subtitle: # 如果上一行是副標題的編號，表示這行是副標題內容
             subtitle = False
             heading["medium"][-1] += text
@@ -578,7 +599,7 @@ else:
                 if "、" in text: # 主標題
                     if heading_livel != 0:# 已有完整段落，製作PPT
                         logging.info(f"{heading}, {verses}")
-                        # print(heading, "\n", verses, "complete paragraph")
+                        print(heading, "\n", verses, "complete paragraph")
                         paragraph_PPT(heading, verses)
                         heading = {"major": "", "medium": [], "minor": {}}
                         verses = [[], {}, {}]  # 大標題，主標題，副標題 經文
@@ -629,7 +650,7 @@ else:
 
     logging.info(f"{heading}, {verses}")
     paragraph_PPT(heading, verses)
-    # print(heading, "\n", verses, "final paragraph")
+    print(heading, "\n", verses, "final paragraph")
     
                 
                         
