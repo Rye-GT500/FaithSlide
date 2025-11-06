@@ -831,6 +831,7 @@ def change_page():
         search_verse_UI()
     else:
         produce_the_slide_UI()
+#選取word檔案位置
 def select_word_file():
     """打開檔案對話框，讓使用者選擇 Word 檔案 (.docx)"""
     # filedialog.askopenfilename() 打開選擇檔案的對話框
@@ -846,7 +847,7 @@ def select_word_file():
         # 如果使用者選擇了檔案，將路徑設定到 StringVar 變數中
         word_path_var.set(path)
         logging.info(f"選取 Word 檔案: {path}")
-
+#選取PPT存檔位置
 def select_save_path():
     """讓使用者指定輸出 PPT 檔案名稱 (.pptx)"""
     path = filedialog.asksaveasfilename(
@@ -878,7 +879,7 @@ quit_btn.grid(row=1, column=1, pady=(15, 0), sticky="w")
 produce_the_slide_UI()
 
 # --- 確保 root 的權重配置 ---
-root.grid_rowconfigure(1, weight=1)      # 讓 quit_btn 所在的第二行 (row=1) 能夠擴展
+root.grid_rowconfigure(1, weight=1)      # 讓 Button 所在的第二行 (row=1) 能夠擴展
 root.grid_columnconfigure(0, weight=1)   # 讓第一列能擴展
 root.grid_columnconfigure(1, weight=1)   # 讓第二列能擴展 (因為 frame 跨越了兩列)
 # ----------------------------
