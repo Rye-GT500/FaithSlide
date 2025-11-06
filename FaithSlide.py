@@ -33,6 +33,10 @@ self_path = os.path.abspath(__file__)
 base_path = os.path.dirname(self_path)
 template_ppt_file = os.path.join(base_path, "template.pptx")
 prs = None
+book_var = None
+chapter_var = None
+verse_var = None
+text_box = None
 
 url = "https://bible.fhl.net/index.html"
 driver = None
@@ -772,6 +776,7 @@ def run_search():
             logging.error("網頁未回應")
 #創建經文查詢UI
 def search_verse_UI():
+    global book_var, chapter_var, verse_var, text_box
     # 標題
     title_label_search = ttk.Label(frame, text="📖 聖經經文查詢", font=("微軟正黑體", 16, "bold"))
     title_label_search.grid(row=0, column=0, columnspan=2, pady=(0, 20))
