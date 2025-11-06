@@ -214,6 +214,7 @@ def run_search():
                 else:
                     messagebox.showwarning("輸入錯誤", "節數錯誤")
                     logging.warning("抓取經文失敗: 節數超出範圍")
+                    break
             logging.info(f"成功抓取 {abbr_to_full[book_abbr]} 第 {chapter} 章 {start}-{end} 節")
         else:
             v= int(verse)
@@ -241,11 +242,11 @@ def close_driver():
 
 root = tk.Tk()
 root.title("聖經經文查詢工具")
-root.geometry("500x500")
+root.geometry("500x650")
 
 # 外框
 frame = ttk.Frame(root, padding=20)
-frame.pack(expand=True)
+frame.grid(row=0, column=0, columnspan=2, sticky="nsew") # 使用 grid()
 
 # 標題
 title_label = ttk.Label(frame, text="📖 聖經經文查詢", font=("微軟正黑體", 16, "bold"))
@@ -255,36 +256,42 @@ title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
 ttk.Label(frame, text="書卷：", font=("微軟正黑體", 12)).grid(row=1, column=0, sticky="e", padx=5, pady=5)
 book_var = tk.StringVar()
 book_combo = ttk.Combobox(frame, textvariable=book_var, values=list(abbr_to_full.keys()), width=15)
-book_combo.grid(row=1, column=1, padx=5, pady=5)
+book_combo.grid(row=1, column=1, padx=5, pady=5, sticky="w")
 
 # 章
 ttk.Label(frame, text="章：", font=("微軟正黑體", 12)).grid(row=2, column=0, sticky="e", padx=5, pady=5)
 chapter_var = tk.StringVar()
 chapter_entry = ttk.Entry(frame, textvariable=chapter_var, width=18)
-chapter_entry.grid(row=2, column=1, padx=5, pady=5)
+chapter_entry.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
 # 節（新加的）
 ttk.Label(frame, text="節：", font=("微軟正黑體", 12)).grid(row=3, column=0, sticky="e", padx=5, pady=5)
 verse_var = tk.StringVar()
 verse_entry = ttk.Entry(frame, textvariable=verse_var, width=18)
-verse_entry.grid(row=3, column=1, padx=5, pady=5)
+verse_entry.grid(row=3, column=1, padx=5, pady=5, sticky="w")
 
 # 查詢按鈕
 search_btn = ttk.Button(frame, text="查詢", command=run_search)
 search_btn.grid(row=4, column=0, columnspan=2, pady=(15, 0))
 
-# 退出按鈕
-search_btn = ttk.Button(frame, text="退出", command=close_driver)
-search_btn.grid(row=5, column=0, columnspan=2, pady=(15, 0))
+text_box = tk.Text(frame, wrap="word")
+text_box.grid(row=5, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
 
-text_box = tk.Text(root, wrap="word")
-text_box.pack(fill="both", expand=True, padx=10, pady=10)
+# 退出按鈕
+quit_btn = ttk.Button(root, text="退出", command=close_driver)
+quit_btn.grid(row=1, column=0, columnspan=2, pady=(15, 0), sticky="n")
 
 # 置中設定
-for i in range(5):
+for i in range(6):
     frame.grid_rowconfigure(i, weight=1)
 frame.grid_columnconfigure(0, weight=1)
 frame.grid_columnconfigure(1, weight=1)
+
+# --- 確保 root 的權重配置 ---
+root.grid_rowconfigure(1, weight=1)      # 讓 text_box 所在的第二行 (row=1) 能夠擴展
+root.grid_columnconfigure(0, weight=1)   # 讓第一列能擴展
+root.grid_columnconfigure(1, weight=1)   # 讓第二列能擴展 (因為 frame 跨越了兩列)
+# ----------------------------
 
 if __name__ == "__main__":
     Thread(target=init_driver, daemon=True).start()
