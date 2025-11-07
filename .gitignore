@@ -27,3 +27,4 @@ temp/
 
 # 忽略特定檔案
 test.pptx
+chromedriver.exe

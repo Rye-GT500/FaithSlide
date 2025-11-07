@@ -1027,3 +1027,4 @@ root.grid_columnconfigure(1, weight=1)   # 讓第二列能擴展 (因為 frame �
 if __name__ == "__main__":
     Thread(target=init_driver, daemon=True).start()
     root.mainloop()
+# print(template_ppt_file)
