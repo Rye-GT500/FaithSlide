@@ -1,0 +1,1 @@
+pyinstaller --onefile --noconsole --add-data "chromedriver.exe:." --add-data "template.pptx:." --name "FaithSlide_Automation" FaithSlide.py
