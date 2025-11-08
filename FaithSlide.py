@@ -18,10 +18,11 @@ from tkinter import ttk, messagebox, filedialog
 
 if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
+    exe_dir = os.path.dirname(sys.executable)
+    log_path = os.path.join(exe_dir, "FaithSlide.log")
 else:
     base_path = os.path.dirname(os.path.abspath(__file__))
-
-log_path = os.path.join(base_path, "FaithSlide.log")
+    log_path = os.path.join(base_path, "FaithSlide.log")
 
 logging.basicConfig(
     filename=log_path,
@@ -29,9 +30,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     encoding="utf-8"
 )
-self_path = os.path.abspath(__file__)
-base_path = os.path.dirname(self_path)
 template_ppt_file = os.path.join(base_path, "template.pptx")
+
 prs = None
 book_var = None
 chapter_var = None
@@ -157,6 +157,7 @@ old_testament_books = [
     "瑪"   # 瑪拉基書
 ]
 search_page = False
+all_book = ["創", "出", "利", "民", "申", "書", "士", "得", "撒上", "撒下", "王上", "王下", "代上", "代下", "拉", "尼", "斯", "伯", "詩", "箴", "傳", "歌", "賽", "耶", "哀", "結", "但", "何", "珥", "摩", "俄", "拿", "彌", "鴻", "哈", "番", "該", "瑪", "亞", "太", "可", "路", "約", "徒", "羅", "林前", "林後", "加", "弗", "腓", "西", "帖前", "帖後", "提前", "提後", "多", "門", "來", "雅", "彼前", "彼後", "約壹", "約貳", "約參", "猶", "啟"]
 main_book = ""
 
 #爬蟲啟動
@@ -204,6 +205,9 @@ def get_verses(book_abbr, chapter, old):
     while not driver_ready:
         sleep(0.5)
     try:
+        if book_abbr in ["約壹", "約貳", "約參"]:
+            index = ["約壹", "約貳", "約參"].index(book_abbr)
+            book_abbr = ["約一", "約二", "約三"][index]
         Dropdown(driver, "name", "chineses", book_abbr, old)
         Dropdown(driver, "name", "chap", chapter, old)
         if old:
@@ -235,8 +239,7 @@ def get_verses(book_abbr, chapter, old):
     except Exception as e:
         logging.warning(f"get_verse {e}")
         messagebox.showwarning("錯誤", "取得經文時錯誤")
-        return []
-        
+        return []    
 #PPT 複製投影片
 def duplicate_slide(prs:Presentation, index):
     try:
@@ -268,7 +271,7 @@ def remove_slide(prs:Presentation, index:int) -> None:
 def verses_PPT(title, verses):
     try:
         if "." not in verses:
-            logging.warning(f"經文格式錯誤，無法製作投影片: {title} {verses}")
+            logging.warning(f"經文格式錯誤，無法製作投影片: title: {title} verse: {verses}")
             return
         num = verses.split(".")[0] + "."
         out_verses = verses.split(".")[1]
@@ -295,7 +298,7 @@ def verses_PPT(title, verses):
             p.add_run()
         
         p.runs[0].text = num
-        p.runs[1].text = out_verses
+        p.runs[1].text = out_verses.replace("　", " ")
     except Exception as e:
         logging.warning(f"verses_PPT {e}")
         messagebox.showwarning("錯誤", "製作經文PPT時錯誤")
@@ -403,7 +406,10 @@ def num_to_chinese(title, chapter_and_verse: str) -> str:
             chinese_chapter += f"{chinese_number[int(chapter[0])]}"
             if chinese_chapter == "一":
                 chinese_chapter = ""
-            chinese_chapter += f"十{chinese_number[int(chapter[1])]}"
+            if chapter[1] == "0":
+                chinese_chapter += "十"
+            else:
+                chinese_chapter += f"十{chinese_number[int(chapter[1])]}"
         elif len(chapter) == 1:
             chinese_chapter = f"{chinese_number[int(chapter[0])]}"
 
@@ -471,8 +477,22 @@ def parse_bible_reference(bible):
                 else:
                     old = False
                 
+                
                 if chapter_and_verse.count(":") > 1:
-                    chapter_and_verse = chapter_and_verse.split(",")
+                    cut_time = 0
+                    new_chapter_and_verse = []
+                    text = ""
+                    for t in chapter_and_verse:
+                        text += t
+                        if t == ":":
+                            cut_time += 1
+                        if cut_time > 1:
+                            verse = "".join(text.split(",")[0:-1])
+                            new_chapter_and_verse.append(verse)
+                            text = text.replace(verse, "")[1::]
+                            cut_time -= 1
+                    new_chapter_and_verse.append(text)
+                    chapter_and_verse = new_chapter_and_verse
                     # print(chapter_and_verse, "is chapter and verse")
                 if isinstance(chapter_and_verse, list):
                     for cav in chapter_and_verse:
@@ -487,7 +507,7 @@ def parse_bible_reference(bible):
                 book = ""
                 chapter_and_verse = ""
             else:
-                book += char
+                book = char
     except Exception as e:
         logging.warning(f"parse_bible_reference {e}")
         messagebox.showwarning("錯誤", "經文書卷解析時錯誤")
@@ -563,6 +583,7 @@ def Analyze_and_produce_the_slides():
                             for run in para.runs:
                                 text = run.text.strip()
                                 if run.bold and text:
+                                    # print(text)
                                     if bold_texts == "證道":
                                         bold_texts = text
                                     else:
@@ -575,6 +596,8 @@ def Analyze_and_produce_the_slides():
                                         for symbol in ["、", ".", ")"]:
                                             if symbol in bold_texts:
                                                 # print("遇到分隔符號，結束證道內容擷取", symbol, bold_texts)
+                                                if bold_texts.split(symbol)[1] == "":
+                                                    continue
                                                 first_part = bold_texts.split(symbol)[0]
                                                 second_part = first_part[-1][-1] + symbol + bold_texts.split(symbol)[1]
                                                 first_part = first_part[:-1]
@@ -585,7 +608,7 @@ def Analyze_and_produce_the_slides():
                                                 bold_texts = text
                                                 break
                                         else:
-                                            for book in ["創", "出", "利", "民", "申", "書", "士", "得", "撒上", "撒下", "王上", "王下", "代上", "代下", "拉", "尼", "斯", "伯", "詩", "箴", "傳", "歌", "賽", "耶", "哀", "結", "但", "何", "珥", "摩", "俄", "拿", "彌", "鴻", "哈", "番", "該", "瑪", "亞", "太", "可", "路", "約", "徒", "羅", "林前", "林後", "加", "弗", "腓", "西", "帖前", "帖後", "提前", "提後", "多", "門", "來", "雅", "彼前", "彼後", "約壹", "約貳", "約參", "猶", "啟"]:
+                                            for book in all_book:
                                                 # if book in bold_texts:
                                                     # print(bold_texts.index(book)+len(book), len(bold_texts))
                                                 if book in bold_texts and (bold_texts.index(book)+len(book) == len(bold_texts) or bold_texts[bold_texts.index(book)+1] in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]):
@@ -611,10 +634,13 @@ def Analyze_and_produce_the_slides():
                                                 if n and n in bold_texts:
                                                     # print(bold_texts.split(n))
                                                     first_part = bold_texts.split(n)[0]
-                                                    bold_texts = bold_texts.replace(first_part, "")
+                                                    bold_texts = bold_texts.replace(first_part, "").replace(" ","")
                                                     # print("遇到數字，結束證道內容擷取", n, first_part)
                                                     if first_part:
-                                                        sermon.append(first_part)
+                                                        if first_part in all_book:
+                                                            sermon.append(first_part)
+                                                        else:
+                                                            sermon[-1] += first_part
                                                     bold_texts += text
 
                                                 else:
@@ -649,7 +675,10 @@ def Analyze_and_produce_the_slides():
             logging.info(ReadTheBible)
             if not isinstance(main_verses, list):
                 for verses in ReadTheBible:
-                    logging.info(verses)
+                    logging.info(f"{main_verses}, {verses}")
+                    if "." not in verses:
+                        main_verses = verses
+                        continue
                     verses_PPT(main_verses, verses)
             else:
                 for verses in main_verses:
@@ -709,69 +738,69 @@ def Analyze_and_produce_the_slides():
             heading_livel = 0
             for step, text in zip(range(1, len(sermon)+1), sermon):
                 update_progress(2.5+step*7/len(sermon), 10, text)
-                if subtitle: # 如果上一行是副標題的編號，表示這行是副標題內容
-                    subtitle = False
-                    heading["medium"][-1] += text
-                elif minor_title: # 如果上一行是小標題的編號，表示這行是小標題內容
-                    minor_title = False
-                    last_medium = heading["medium"][-1]
-                    heading["minor"][last_medium][-1] += text
+                # if subtitle: # 如果上一行是副標題的編號，表示這行是副標題內容
+                #     subtitle = False
+                #     heading["medium"][-1] += text
+                # elif minor_title: # 如果上一行是小標題的編號，表示這行是小標題內容
+                #     minor_title = False
+                #     last_medium = heading["medium"][-1]
+                #     heading["minor"][last_medium][-1] += text
+                # else:
+                if not make_main_title: # 大標題
+                    main_title_PPT(text)
+                    make_main_title = True
                 else:
-                    if not make_main_title: # 大標題
-                        main_title_PPT(text)
-                        make_main_title = True
+                    if "、" in text: # 主標題
+                        if heading_livel != 0:# 已有完整段落，製作PPT
+                            logging.info(f"{heading}, {verses}")
+                            # print(heading, "\n", verses, "complete paragraph")
+                            paragraph_PPT(heading, verses)
+                            heading = {"major": "", "medium": [], "minor": {}}
+                            verses = [[], {}, {}]  # 大標題，主標題，副標題 經文
+
+                        heading_livel = 1
+                        heading["major"] = text
+                    elif "." in text: # 副標題
+                        if heading["major"] == "":
+                            logging.info("副標題出現於主標題之前，格式錯誤")
+                        else:  
+                            heading["medium"].append(text)
+                            
+                            subtitle = True
+                            heading_livel = 2
+
+                    elif ")" in text:  # 小標題，待測試
+                        heading_livel = 3
+                        if len(heading["medium"]) == 0:
+                            logging.info("小標題出現於副標題之前，格式錯誤")
+                        if heading["medium"][-1] not in heading["minor"].keys():
+                            heading["minor"][heading["medium"][-1]] = []
+                        heading["minor"][heading["medium"][-1]].append(text)
+                        minor_title = True
+
                     else:
-                        if "、" in text: # 主標題
-                            if heading_livel != 0:# 已有完整段落，製作PPT
-                                logging.info(f"{heading}, {verses}")
-                                # print(heading, "\n", verses, "complete paragraph")
-                                paragraph_PPT(heading, verses)
-                                heading = {"major": "", "medium": [], "minor": {}}
-                                verses = [[], {}, {}]  # 大標題，主標題，副標題 經文
-
-                            heading_livel = 1
-                            heading["major"] = text
-                        elif "." in text: # 副標題
-                            if heading["major"] == "":
-                                logging.info("副標題出現於主標題之前，格式錯誤")
-                            else:  
-                                heading["medium"].append(text)
-                                
-                                subtitle = True
-                                heading_livel = 2
-
-                        elif ")" in text:  # 小標題，待測試
-                            heading_livel = 3
-                            if len(heading["medium"]) == 0:
-                                logging.info("小標題出現於副標題之前，格式錯誤")
-                            if heading["medium"][-1] not in heading["minor"].keys():
-                                heading["minor"][heading["medium"][-1]] = []
-                            heading["minor"][heading["medium"][-1]].append(text)
-                            minor_title = True
-
+                        # print(text, "is verse")
+                        is_verse = False
+                        for t in text:
+                            if t in number:
+                                is_verse = True
+                                break
                         else:
-                            # print(text, "is verse")
-                            is_verse = False
-                            for t in text:
-                                if t in number:
-                                    is_verse = True
-                                    break
+                            if text in abbr_to_full.keys():
+                                is_verse = True
+                        if is_verse:
+                            if heading_livel == 1:
+                                verses[0].append(text)
+                            elif heading_livel == 2:
+                                if heading["medium"][-1] not in verses[1].keys():
+                                    verses[1][heading["medium"][-1]] = []
+                                verses[1][heading["medium"][-1]].append(text)
                             else:
-                                if text in abbr_to_full.keys():
-                                    is_verse = True
-                            if is_verse:
-                                if heading_livel == 1:
-                                    verses[0].append(text)
-                                elif heading_livel == 2:
-                                    if heading["medium"][-1] not in verses[1].keys():
-                                        verses[1][heading["medium"][-1]] = []
-                                    verses[1][heading["medium"][-1]].append(text)
-                                else:
-                                    last_medium = heading["medium"][-1]
-                                    if heading["minor"][last_medium][-1] not in verses[2].keys():
-                                        verses[2][heading["minor"][last_medium][-1]] = []
-                                    verses[2][heading["minor"][last_medium][-1]].append(text)
-                                    # print("小標題經文待測試")
+                                last_medium = heading["medium"][-1]
+                                if heading["minor"][last_medium][-1] not in verses[2].keys():
+                                    verses[2][heading["minor"][last_medium][-1]] = []
+                                verses[2][heading["minor"][last_medium][-1]].append(text)
+                                # print("小標題經文待測試")
 
             logging.info(f"{heading}, {verses}")
             paragraph_PPT(heading, verses)
