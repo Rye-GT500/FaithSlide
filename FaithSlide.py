@@ -576,7 +576,7 @@ def Analyze_and_produce_the_slides():
                 if tatil == "讀經":
                     row_texts = [cell.text.strip() for cell in row.cells]
                     ReadTheBible = row_texts[1].split("\n")
-                elif tatil == "證道": #添加全形分割符號支援
+                elif tatil == "證道": 
                     bold_texts  = ""
                     for cell in row.cells:
                         for para in cell.paragraphs:
@@ -644,6 +644,7 @@ def Analyze_and_produce_the_slides():
                                                     bold_texts += text
 
                                                 else:
+                                                    print(bold_texts, text)
                                                     bold_texts += text
                                                     continue
         sermon.append(bold_texts)
@@ -651,6 +652,7 @@ def Analyze_and_produce_the_slides():
         logging.warning(f"Analyze_and_produce_the_slides {e}")
         messagebox.showwarning("錯誤", "分析word時錯誤")
         return
+    
     try:
         update_progress(1, 10, "分析word完畢")
 
@@ -708,6 +710,7 @@ def Analyze_and_produce_the_slides():
         logging.warning(f"Analyze_and_produce_the_slides {e}")
         messagebox.showwarning("錯誤", "製作讀經PPT時錯誤")
         return
+    
     try:
         for book in full_to_abbr.keys():
             if isinstance(main_verses, list):
@@ -724,6 +727,7 @@ def Analyze_and_produce_the_slides():
         logging.warning(f"Analyze_and_produce_the_slides {e}")
         messagebox.showwarning("錯誤", "分析主經文時錯誤")
         return
+    
     try:
         if not sermon:
             logging.warning("證道抓取失敗")
