@@ -15,6 +15,7 @@ import sys
 from random import uniform
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import re
 
 if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
@@ -158,6 +159,7 @@ old_testament_books = [
 ]
 search_page = False
 all_book = ["創", "出", "利", "民", "申", "書", "士", "得", "撒上", "撒下", "王上", "王下", "代上", "代下", "拉", "尼", "斯", "伯", "詩", "箴", "傳", "歌", "賽", "耶", "哀", "結", "但", "何", "珥", "摩", "俄", "拿", "彌", "鴻", "哈", "番", "該", "瑪", "亞", "太", "可", "路", "約", "徒", "羅", "林前", "林後", "加", "弗", "腓", "西", "帖前", "帖後", "提前", "提後", "多", "門", "來", "雅", "彼前", "彼後", "約壹", "約貳", "約參", "猶", "啟"]
+books = "創|出|利|民|申|書|士|得|撒上|撒下|王上|王下|代上|代下|拉|尼|斯|伯|詩|箴|傳|歌|賽|耶|哀|結|但|何|珥|摩|俄|拿|彌|鴻|哈|番|該|瑪|亞|太|可|路|約|徒|羅|林前|林後|加|弗|腓|西|帖前|帖後|提前|提後|多|門|來|雅|彼前|彼後|約壹|約貳|約參|猶|啟"
 main_book = ""
 
 #爬蟲啟動
@@ -551,8 +553,26 @@ def close_driver():
     except Exception as e:
         logging.warning(f"close_driver {e}")
         messagebox.showwarning("錯誤", "關閉程式時發生異常，請稍後再試")
-#分析word製作ppt
-def Analyze_and_produce_the_slides():
+#分析word
+def analyze_word(text):
+    for word in ["證道", "傳道", "牧師", "吳佩倫", "錢致榮"]:
+        text = text.replace(word, "")
+    parts = re.split(r'(?=[一二三四五六七八九十]+、|\d+\.|\d+\))', text)
+    sermon = []
+    for p in parts:
+        # print(p)
+        title = p
+        del_matches = re.findall(rf"(?<![\u4e00-\u9fff])(?:{books})+\s\d+:(?:\d+(?:-\d+)?)+(?:,\s\d+(?::\d+)*(?:-\d+)?)*", p)
+        matches = re.findall(rf"(?<![\u4e00-\u9fff])(?:{books})+(?![\u4e00-\u9fff])|\d+:(?:\d+(?:-\d+)?)+(?:,\s\d+(?::\d+)*(?:-\d+)?)*", p)
+        cleaned_matches = [m.replace(" ", "") for m in matches]
+        if del_matches:
+            title = title.split(del_matches[0])[0].replace(" ", "")
+
+        sermon.append(title.strip())
+        sermon.extend(cleaned_matches)
+    return sermon
+#製作ppt
+def produce_the_slides():
     # messagebox.showwarning("開始製作投影片，請稍候...")
     global main_book, prs
     try:
@@ -563,91 +583,26 @@ def Analyze_and_produce_the_slides():
         # print(wordfile_path)
         doc = Document(wordfile_path)
         ReadTheBible = []
-        sermon = []
+        text_box = []
         # 逐個表格抓文字
         for t_idx, table in enumerate(doc.tables):
             # print(f"=== 表格 {t_idx+1} ===")
             for r_idx, row in enumerate(table.rows):
-                # 取每個儲存格文字，去掉前後空白
-                
-                # print(row_texts)
                 tatil = row.cells[0].text.strip()
                 # 只印出有內容的列
                 if tatil == "讀經":
                     row_texts = [cell.text.strip() for cell in row.cells]
                     ReadTheBible = row_texts[1].split("\n")
                 elif tatil == "證道": 
-                    bold_texts  = ""
                     for cell in row.cells:
                         for para in cell.paragraphs:
                             for run in para.runs:
                                 text = run.text.strip()
                                 if run.bold and text:
                                     # print(text)
-                                    if bold_texts == "證道":
-                                        bold_texts = text
-                                    else:
-                                        if text in ["錢致榮", "牧師", "傳道", "吳佩倫"]:
-                                            if bold_texts != "":
-                                                # print("遇到講員名稱，結束證道內容擷取", bold_texts)
-                                                sermon.append(bold_texts)
-                                            bold_texts = ""
-                                            continue
-                                        for symbol in ["、", ".", ")"]:
-                                            if symbol in bold_texts:
-                                                # print("遇到分隔符號，結束證道內容擷取", symbol, bold_texts)
-                                                if bold_texts.split(symbol)[1] == "":
-                                                    continue
-                                                first_part = bold_texts.split(symbol)[0]
-                                                second_part = first_part[-1][-1] + symbol + bold_texts.split(symbol)[1]
-                                                first_part = first_part[:-1]
-                                                if first_part:
-                                                    sermon.append(first_part)
-                                                if second_part: 
-                                                    sermon.append(second_part)
-                                                bold_texts = text
-                                                break
-                                        else:
-                                            for book in all_book:
-                                                # if book in bold_texts:
-                                                    # print(bold_texts.index(book)+len(book), len(bold_texts))
-                                                if book in bold_texts and (bold_texts.index(book)+len(book) == len(bold_texts) or bold_texts[bold_texts.index(book)+1] in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]):
-                                                    first_part = bold_texts.split(book)[0]
-                                                    bold_texts = bold_texts.replace(first_part, "")
-                                                    # print("遇到書卷，結束證道內容擷取", book, first_part, bold_texts)
-                                                    if first_part:
-                                                        sermon.append(first_part)
-                                                    if bold_texts:
-                                                        sermon.append(bold_texts)
-                                                    bold_texts = text
-                                                    break
-                                            else:
-                                                n = ""
-                                                min_num_index = len(bold_texts)
-                                                for num in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]:
-                                                    if num in bold_texts:
-                                                        idx = bold_texts.index(num)
-                                                        if idx < min_num_index:
-                                                            min_num_index = idx
-                                                            n = num
-                                                # print("最小數字索引", min_num_index, n)
-                                                if n and n in bold_texts:
-                                                    # print(bold_texts.split(n))
-                                                    first_part = bold_texts.split(n)[0]
-                                                    bold_texts = bold_texts.replace(first_part, "").replace(" ","")
-                                                    # print("遇到數字，結束證道內容擷取", n, first_part)
-                                                    if first_part:
-                                                        if first_part in all_book:
-                                                            sermon.append(first_part)
-                                                        else:
-                                                            sermon[-1] += first_part
-                                                    bold_texts += text
+                                    text_box.append(text)
+        sermon = analyze_word(" ".join(text_box))
 
-                                                else:
-                                                    print(bold_texts, text)
-                                                    bold_texts += text
-                                                    continue
-        sermon.append(bold_texts)
     except Exception as e:
         logging.warning(f"Analyze_and_produce_the_slides {e}")
         messagebox.showwarning("錯誤", "分析word時錯誤")
@@ -830,7 +785,7 @@ def Analyze_and_produce_the_slides():
     # messagebox.showwarning("製作完成")
 #以另一線程製作PPT
 def Start_produce():
-    Thread(target=Analyze_and_produce_the_slides, daemon=True).start()
+    Thread(target=produce_the_slides, daemon=True).start()
 #清空UI介面
 def clear_frame(frame_to_clear):
     try:
