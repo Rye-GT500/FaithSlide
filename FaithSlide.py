@@ -562,8 +562,8 @@ def analyze_word(text):
     for p in parts:
         # print(p)
         title = p
-        del_matches = re.findall(rf"(?<![\u4e00-\u9fff])(?:{books})+\s\d+:(?:\d+(?:-\d+)?)+(?:,\s\d+(?::\d+)*(?:-\d+)?)*", p)
-        matches = re.findall(rf"(?<![\u4e00-\u9fff])(?:{books})+(?![\u4e00-\u9fff])|\d+:(?:\d+(?:-\d+)?)+(?:,\s\d+(?::\d+)*(?:-\d+)?)*", p)
+        del_matches = re.findall(rf"\d+:(?:\d+(?:-\d+)?)+(?:,\s*\d+(?::\d+)*(?:-\d+)?)*|(?<![\u4e00-\u9fff])(?:{books})+\s\d+:(?:\d+(?:-\d+)?)+(?:,\s*\d+(?::\d+)*(?:-\d+)?)*", p)
+        matches = re.findall(rf"(?<![\u4e00-\u9fff])(?:{books})+(?![\u4e00-\u9fff])|\d+:(?:(?:\d+\s*)(?:-\s*(?:\d+\s*))?)+(?:\s*,\s*(?:\d+\s*)*(?::\d+)*(?:-\s*(?:\d+\s*)*)?)*", p)
         cleaned_matches = [m.replace(" ", "") for m in matches]
         if del_matches:
             title = title.split(del_matches[0])[0].replace(" ", "")
