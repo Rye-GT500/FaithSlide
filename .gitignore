@@ -28,3 +28,5 @@ temp/
 # 忽略特定檔案
 *.pptx
 *.exe
+sermon_analysis_test.ipynb
+sermon_analysis_test.py
