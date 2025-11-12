@@ -201,7 +201,7 @@ def Dropdown(driver, by, name, value, old):
         sleep(uniform(0.1, 0.2))
     except Exception:
         # messagebox.showwarning(f"搜尋不到下拉選單 {name}")
-        logging.error(f"搜尋不到下拉選單 {name}")
+        logging.error(f"搜尋不到下拉選單 {name} 章節 {value}")
 #爬蟲抓經文
 def get_verses(book_abbr, chapter, old):
     while not driver_ready:
@@ -692,19 +692,9 @@ def produce_the_slides():
             make_main_title = False
             heading = {"major": "", "medium": [], "minor": {}}
             verses = [[], {}, {}]  # 大標題，主標題，副標題 經文
-            subtitle = False
-            minor_title = False
             heading_livel = 0
             for step, text in zip(range(1, len(sermon)+1), sermon):
-                update_progress(2.5+step*7/len(sermon), 10, text)
-                # if subtitle: # 如果上一行是副標題的編號，表示這行是副標題內容
-                #     subtitle = False
-                #     heading["medium"][-1] += text
-                # elif minor_title: # 如果上一行是小標題的編號，表示這行是小標題內容
-                #     minor_title = False
-                #     last_medium = heading["medium"][-1]
-                #     heading["minor"][last_medium][-1] += text
-                # else:
+                update_progress(2.5+step*7/len(sermon), 10, heading["major"])
                 if not make_main_title: # 大標題
                     main_title_PPT(text)
                     make_main_title = True
@@ -782,7 +772,7 @@ def produce_the_slides():
         logging.warning(f"Analyze_and_produce_the_slides {e}")
         messagebox.showwarning("錯誤", "PPT存檔錯誤")
         return
-    # messagebox.showwarning("製作完成")
+    messagebox.showinfo("", "製作完成")
 #以另一線程製作PPT
 def Start_produce():
     Thread(target=produce_the_slides, daemon=True).start()
