@@ -26,6 +26,5 @@ temp/
 ._*
 
 # 忽略特定檔案
-chromedriver.exe
 *.pptx
-
+*.exe
