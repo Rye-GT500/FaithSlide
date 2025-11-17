@@ -1,5 +1,6 @@
 from docx import Document
 from pptx import Presentation
+from pptx.util import Pt
 from pptx.util import Inches
 import copy
 import os
@@ -272,6 +273,54 @@ def remove_slide(prs:Presentation, index:int) -> None:
     except Exception as e:
         logging.warning(f"remove_slide {e}")
         messagebox.showwarning("錯誤", "刪除PPT時錯誤")
+def get_weighted_length(text: str) -> float:
+    length = 0.0
+    for char in text:
+        if re.match(r'[\u4e00-\u9fff]|["，。？！：「」；]', char):
+            length += 1.0  # Chinese character
+        else:
+            length += 0.5  # Non-Chinese character
+    # print(length)
+    return length
+
+def calculate_font_size(text: str, current_base_size=72) -> Pt:
+    
+    # 參數設定
+    MAX_WIDTH_UNITS = 854 # 每行最大中文字符數（需實驗調整）
+    MAX_HIGHT_UNITS = 372  # 每頁最大行數（需實驗調整）
+    MIN_FONT_SIZE = 20   # 最小可讀字體大小
+    
+    total_length = get_weighted_length(text)
+    
+    # 1. 計算縮放因子 (Scaling Factor)
+    # 如果長度超過最大單行容量，則需要縮放
+    
+    left_size = MIN_FONT_SIZE
+    right_size = current_base_size
+    # 二分法微調字體大小
+    while right_size - left_size > 0.01:
+        mid_size = (left_size + right_size) / 2
+        width_units = int(MAX_WIDTH_UNITS / mid_size)
+        hight_units = int(MAX_HIGHT_UNITS / mid_size)
+        if total_length > width_units * hight_units:
+            right_size = mid_size
+        else:
+            left_size = mid_size
+        new_size = left_size
+        # print(f"mid_size: {mid_size}, width_units: {width_units}, hight_units: {hight_units}, total_length: {width_units * hight_units}")
+
+
+
+    # 3. 施加約束（防止字體過小或超過基數）
+    if new_size < MIN_FONT_SIZE:
+        final_size = MIN_FONT_SIZE
+    elif new_size > current_base_size:
+        final_size = current_base_size
+    else:
+        final_size = new_size
+    # print(final_size)
+
+    return Pt(final_size) # 必須返回 pptx.util.Pt 對象
 #PPT 經文投影片
 def verses_PPT(title, verses):
     try:
@@ -303,7 +352,13 @@ def verses_PPT(title, verses):
             p.add_run()
         
         p.runs[0].text = num
-        p.runs[1].text = out_verses.replace("　", " ")
+        out_verses = out_verses.replace("　", " ")    
+        p.runs[1].text = out_verses
+        text_size = calculate_font_size(out_verses)
+        p.font.size = text_size
+        if text_size < Pt(66):
+            p.runs[0].font.size = text_size
+        p.runs[1].font.size = text_size
     except Exception as e:
         logging.warning(f"verses_PPT {e}")
         messagebox.showwarning("錯誤", "製作經文PPT時錯誤")
