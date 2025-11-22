@@ -322,7 +322,7 @@ def calculate_font_size(text: str, current_base_size=72) -> Pt:
 
     return Pt(final_size) # 必須返回 pptx.util.Pt 對象
 #PPT 經文投影片
-def verses_PPT(title, verses):
+def verses_PPT(title:str, verses:str):
     try:
         if "." not in verses:
             logging.warning(f"經文格式錯誤，無法製作投影片: title: {title} verse: {verses}")
@@ -339,6 +339,8 @@ def verses_PPT(title, verses):
         p = text_frame.paragraphs[0]
         if not p.runs:
             p.add_run()
+        if "詩篇" in title:
+            title = title.replace("章", "篇")
         p.runs[0].text = title
         for i in range(1, 3):
             try:
@@ -354,10 +356,9 @@ def verses_PPT(title, verses):
         p.runs[0].text = num
         out_verses = out_verses.replace("　", " ")    
         p.runs[1].text = out_verses
+
         text_size = calculate_font_size(out_verses)
-        p.font.size = text_size
-        if text_size < Pt(66):
-            p.runs[0].font.size = text_size
+        p.runs[0].font.size = text_size
         p.runs[1].font.size = text_size
     except Exception as e:
         logging.warning(f"verses_PPT {e}")
@@ -620,8 +621,8 @@ def analyze_word(text):
     for p in parts:
         # print(p)
         title = p
-        del_matches = re.findall(rf"\d+:(?:\d+(?:-\d+)?)+(?:,\s*\d+(?::\d+)*(?:-\d+)?)*|(?<![\u4e00-\u9fff])(?:{books})+\s\d+:(?:\d+(?:-\d+)?)+(?:,\s*\d+(?::\d+)*(?:-\d+)?)*", p)
-        matches = re.findall(rf"(?<![\u4e00-\u9fff])(?:{books})+(?![\u4e00-\u9fff])|\d+:(?:(?:\d+\s*)(?:-\s*(?:\d+\s*))?)+(?:\s*,\s*(?:\d+\s*)*(?::\d+)*(?:-\s*(?:\d+\s*)*)?)*", p)
+        del_matches = re.findall(rf"(?<![\u4e00-\u9fff])(?:{books})+\s*\d+\s*:\s*(?:\d+(?:-\d+)?)+(?:,\s*\d+(?::\s*\d+)*(?:-\s*\d+)?)*|\d+\s*:(?:\s*\d+(?:-\s*\d+)?)+(?:,\s*\d+(?::\s*\d+)*(?:-\s*\d+)?)*", p)
+        matches = re.findall(rf"(?<![\u4e00-\u9fff])(?:{books})+(?![\u4e00-\u9fff])|\d+\s*:(?:(?:\s*\d+\s*)(?:-\s*(?:\s*\d+\s*))?)+(?:\s*,\s*(?:\d+\s*)*(?::\s*\d+)*(?:-\s*(?:\d+\s*)*)?)*", p)
         cleaned_matches = [m.replace(" ", "") for m in matches]
         if del_matches:
             title = title.split(del_matches[0])[0].replace(" ", "")
