@@ -1,2 +1,1 @@
-pyinstaller --onefile --noconsole --add-data "chromedriver.exe:." --add-data "template.pptx:." --name "FaithSlide_Automation 1.1.0-deta" FaithSlide.py
-pyinstaller --onefile --noconsole --add-data "chromedriver.exe;." --add-data "template.pptx;." --name "FaithSlide_Automation 1.1.1-beta" FaithSlide.py
+pyinstaller --onefile --noconsole --add-data "chromedriver.exe;." --add-data "template.pptx;." --name "FaithSlide_Automation 1.1.2-beta" FaithSlide.py
