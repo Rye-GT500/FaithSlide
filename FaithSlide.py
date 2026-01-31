@@ -1,23 +1,17 @@
 from docx import Document
 from pptx import Presentation
 from pptx.util import Pt
-from pptx.util import Inches
 import copy
 import os
 from threading import Thread
 import logging
-from selenium import webdriver
-from selenium.webdriver.support.ui import Select
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.chrome.service import Service
-from bs4 import BeautifulSoup
 from time import sleep
 import sys
 from random import uniform
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import re
-from webdriver_manager.chrome import ChromeDriverManager
+import requests
 
 if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
@@ -41,9 +35,7 @@ chapter_var = None
 verse_var = None
 text_box = None
 progress_bar = None
-url = "https://bible.fhl.net/index.html"
-driver = None
-driver_ready = False  # 是否完成初始化
+url = "https://bible.fhl.net/json/qb.php"
 # 簡稱 -> 全名
 abbr_to_full = {
     "創": "創世記",
@@ -121,129 +113,42 @@ full_to_abbr = {v: k for k, v in abbr_to_full.items()}
 chinese_number = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
 number = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
 # 旧约书卷列表
-old_testament_books = [
-    "創",  # 創世記
-    "出",  # 出埃及記
-    "利",  # 利未記
-    "民",  # 民數記
-    "申",  # 申命記
-    "書",  # 約書亞記
-    "士",  # 士師記
-    "得",  # 路得記
-    "撒上",  # 撒母耳記上
-    "撒下",  # 撒母耳記下
-    "王上",  # 列王紀上
-    "王下",  # 列王紀下
-    "代上",  # 歷代志上
-    "代下",  # 歷代志下
-    "拉",  # 以斯拉記
-    "尼",  # 尼希米記
-    "斯",  # 以斯帖記
-    "伯",  # 約伯記
-    "詩",  # 詩篇
-    "箴",  # 箴言
-    "傳",  # 傳道書
-    "歌",  # 雅歌
-    "賽",  # 以賽亞書
-    "耶",  # 耶利米書
-    "哀",  # 耶利米哀歌
-    "結",  # 以西結書
-    "但",  # 但以理書
-    "何",  # 何西阿書
-    "珥",  # 約珥書
-    "摩",  # 阿摩司書
-    "俄",  # 俄巴底亞書
-    "拿",  # 約拿書
-    "彌",  # 彌迦書
-    "鴻",  # 那鴻書
-    "哈",  # 哈巴谷書
-    "番",  # 西番雅書
-    "該",  # 哈該書
-    "亞",  # 撒迦利亞書
-    "瑪"   # 瑪拉基書
-]
 search_page = False
 # all_book = ["創", "出", "利", "民", "申", "書", "士", "得", "撒上", "撒下", "王上", "王下", "代上", "代下", "拉", "尼", "斯", "伯", "詩", "箴", "傳", "歌", "賽", "耶", "哀", "結", "但", "何", "珥", "摩", "俄", "拿", "彌", "鴻", "哈", "番", "該", "瑪", "亞", "太", "可", "路", "約", "徒", "羅", "林前", "林後", "加", "弗", "腓", "西", "帖前", "帖後", "提前", "提後", "多", "門", "來", "雅", "彼前", "彼後", "約壹", "約貳", "約參", "猶", "啟"]
 books = "創|出|利|民|申|書|士|得|撒上|撒下|王上|王下|代上|代下|拉|尼|斯|伯|詩|箴|傳|歌|賽|耶|哀|結|但|何|珥|摩|俄|拿|彌|鴻|哈|番|該|瑪|亞|太|可|路|約|徒|羅|林前|林後|加|弗|腓|西|帖前|帖後|提前|提後|多|門|來|雅|彼前|彼後|約壹|約貳|約參|猶|啟|約一|約二|約三"
 main_book = ""
 
-#爬蟲啟動
-def init_driver():
-    global driver, driver_ready
-    try:
-        option = webdriver.ChromeOptions()
-        option.add_argument('--headless')
-        
-        # 使用自動下載管理工具，不再依賴手動放進去的 exe
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=option)
-        
-        driver.get(url)
-        driver_ready = True
-        logging.info("Selenium 自動管理啟動成功！")
-    except Exception as e:
-        logging.error(f"啟動失敗，錯誤原因：{e}")
-
-#爬蟲點擊
-def tap_button(driver, button):
-    try:
-        tap = driver.find_element('css selector', button)
-        driver.execute_script('arguments[0].click();', tap)
-    except TimeoutException:
-        pass
-    except Exception:
-        # messagebox.showwarning("點擊錯誤")
-        logging.error(f"點擊錯誤：{button}")
-#爬蟲下拉選單
-def Dropdown(driver, by, name, value, old):
-    try:
-        select_element = driver.find_elements(by, name)
-        BookDropdown = Select(select_element[0 if old else 1])
-        BookDropdown.select_by_value(value)
-        sleep(uniform(0.1, 0.2))
-    except Exception:
-        # messagebox.showwarning(f"搜尋不到下拉選單 {name}")
-        logging.error(f"搜尋不到下拉選單 {name} 章節 {value}")
 #爬蟲抓經文
-def get_verses(book_abbr, chapter, old):
-    while not driver_ready:
-        sleep(0.5)
+def get_verses(book_abbr, chapter):
     try:
         if book_abbr in ["約壹", "約貳", "約參"]:
             index = ["約壹", "約貳", "約參"].index(book_abbr)
             book_abbr = ["約一", "約二", "約三"][index]
-        Dropdown(driver, "name", "chineses", book_abbr, old)
-        Dropdown(driver, "name", "chap", chapter, old)
-        if old:
-            tap_button(driver, "#content > div > form:nth-child(10) > input[type=submit]:nth-child(19)")
-        else:
-            tap_button(driver, "#content > div > form:nth-child(13) > input[type=submit]:nth-child(15)")
-        sleep(1)
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        verses = []
-        all_Verse = soup.find_all("tr")
 
-        for i in all_Verse:
-            try:
-                td = i.find_all("td")
-                if len(td) >= 2:
-                    VerseNumber = td[0].text
-                    if ":" in VerseNumber:
-                        VerseNumber = VerseNumber.split(":")[1]
-                        verses.append(f"{VerseNumber}. {td[1].text.strip()}")
-            except Exception as e:
-                # messagebox.showwarning(f"抓取經文錯誤: {e}")
-                logging.error(f"抓取經文錯誤: {e}")
+        params = {
+            "chineses": book_abbr,   # 書卷
+            "chap": chapter,        # 章
+            "version": "unv",   # 強制指定為和合本 (Union Version)
+            "strong": "0"       # 明確要求不要 Strong Number
+        }
 
-        driver.get(url)
-        driver.implicitly_wait(8)
-        sleep(uniform(0.1, 0.5))
+        # 執行請求
+        response = requests.get(url, params=params, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json() # 這行最關鍵！直接把結果變字典
+            verses = []
 
-        return verses
+            if data.get('status') == 'success':
+                for record in data["record"]:
+                    verses.append(f"{record['sec']}. {record['bible_text']}")
+                return verses
+            else:
+                logging.warning(f"API 狀態錯誤: {data.get('status')}")
+        return []
     except Exception as e:
-        logging.warning(f"get_verse {e}")
-        messagebox.showwarning("錯誤", "取得經文時錯誤")
-        return []    
+        logging.error(f"get_verses 發生異常: {e}")
+        return []
 #PPT 複製投影片
 def duplicate_slide(prs:Presentation, index):
     try:
@@ -493,11 +398,11 @@ def analyze_paragraph(title, verse_analyze, verses):
         logging.warning(f"analyze_paragraph {e}")
         messagebox.showwarning("錯誤", "經文節數分析時錯誤")
 #PPT 經文章節處理
-def process_reference_block(chapter_and_verse, book, old):
+def process_reference_block(chapter_and_verse, book):
     try:
-        scrape_verses = get_verses(book, chapter_and_verse.split(":")[0], old)
+        scrape_verses = get_verses(book, chapter_and_verse.split(":")[0])
         if scrape_verses == []:
-            logging.warning(f"尚未取得經文，跳過，{book} {chapter_and_verse} {old}")
+            logging.warning(f"尚未取得經文，跳過，{book} {chapter_and_verse}")
             return
         
         title = f"{abbr_to_full[book]}"
@@ -529,13 +434,7 @@ def parse_bible_reference(bible):
             if char[0] in number:
                 chapter_and_verse += char
                 if book == "":
-                    book = main_book
-                
-                if book in old_testament_books:
-                    old = True
-                else:
-                    old = False
-                
+                    book = main_book                
                 
                 if chapter_and_verse.count(":") > 1:
                     cut_time = 0
@@ -552,16 +451,11 @@ def parse_bible_reference(bible):
                             cut_time -= 1
                     new_chapter_and_verse.append(text)
                     chapter_and_verse = new_chapter_and_verse
-                    # print(chapter_and_verse, "is chapter and verse")
                 if isinstance(chapter_and_verse, list):
                     for cav in chapter_and_verse:
-                        # print(cav, book, old)
-                        process_reference_block(cav, book, old)
+                        process_reference_block(cav, book)
                 else:
-                    # print(chapter_and_verse, book, old)
-                    process_reference_block(chapter_and_verse, book, old)
-                    # print(chapter_and_verse)
-                
+                    process_reference_block(chapter_and_verse, book)                
 
                 book = ""
                 chapter_and_verse = ""
@@ -605,7 +499,6 @@ def paragraph_PPT(heading, verses):
 #關閉驅動程式
 def close_driver():
     try:
-        driver.quit()
         root.destroy()
     except Exception as e:
         logging.warning(f"close_driver {e}")
@@ -858,17 +751,8 @@ def run_search():
                 messagebox.showwarning("輸入錯誤", "書卷名稱錯誤")
                 logging.error("輸入錯誤", "書卷名稱錯誤")
                 return
-        if book_abbr in old_testament_books:
-            old = True
-        else:
-            old = False
-        # messagebox.showinfo("請稍候", f"正在抓取 {abbr_to_full[book_abbr]} 第 {chapter} 章 ...")
-        if not driver_ready:
-            messagebox.showinfo("請稍候", "Selenium 正在初始化，請稍後再查詢。")
-            logging.warning("Selenium 正在初始化")
-            return
 
-        verses = get_verses(book_abbr, chapter, old)
+        verses = get_verses(book_abbr, chapter)
 
         text_box.delete(1.0, tk.END)
         if verse:
@@ -1060,6 +944,4 @@ root.grid_columnconfigure(1, weight=1)   # 讓第二列能擴展 (因為 frame �
 # ----------------------------
 
 if __name__ == "__main__":
-    Thread(target=init_driver, daemon=True).start()
     root.mainloop()
-# print(template_ppt_file)

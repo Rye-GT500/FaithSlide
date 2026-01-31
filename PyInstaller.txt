@@ -1,1 +1,1 @@
-pyinstaller --onefile --noconsole --add-data "template.pptx;." --name "FaithSlide_Automation 1.1.3-beta" FaithSlide.py
+pyinstaller --onefile --noconsole --add-data "template.pptx;." --name "FaithSlide 1.2.0-beta" FaithSlide.py
