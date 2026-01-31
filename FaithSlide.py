@@ -17,6 +17,7 @@ from random import uniform
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import re
+from webdriver_manager.chrome import ChromeDriverManager
 
 if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
@@ -78,12 +79,12 @@ abbr_to_full = {
     "俄": "俄巴底亞書",
     "拿": "約拿書",
     "彌": "彌迦書",
-    "鴻": "何西阿書",  # 小先知書，部分版本略有不同
+    "鴻": "那鴻書",  # 小先知書，部分版本略有不同
     "哈": "哈巴谷書",
     "番": "西番雅書",
     "該": "哈該書",
-    "瑪": "撒迦利亞書",
-    "亞": "瑪拉基書",
+    "瑪": "瑪拉基書",
+    "亞": "撒迦利亞書",
     "太": "馬太福音",
     "可": "馬可福音",
     "路": "路加福音",
@@ -172,20 +173,17 @@ def init_driver():
     try:
         option = webdriver.ChromeOptions()
         option.add_argument('--headless')
-        option.add_experimental_option('excludeSwitches', ['enable-automation'])
-        if getattr(sys, 'frozen', False):
-            driver_path = os.path.join(sys._MEIPASS, "chromedriver.exe")
-            driver = webdriver.Chrome(service=Service(driver_path), options=option)
-        else:
-            driver = webdriver.Chrome(options=option)
+        
+        # 使用自動下載管理工具，不再依賴手動放進去的 exe
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=option)
+        
         driver.get(url)
-        driver.implicitly_wait(8)
-        sleep(0.5)
         driver_ready = True
-        # print("✅ Selenium 已預載完成！")
+        logging.info("Selenium 自動管理啟動成功！")
     except Exception as e:
-        # messagebox.showwarning("⚠️ 初始化 Selenium 失敗：", e)
-        logging.error(f"⚠️ 初始化 Selenium 失敗：{e}")
+        logging.error(f"啟動失敗，錯誤原因：{e}")
+
 #爬蟲點擊
 def tap_button(driver, button):
     try:
@@ -239,7 +237,7 @@ def get_verses(book_abbr, chapter, old):
 
         driver.get(url)
         driver.implicitly_wait(8)
-        sleep(0.3)
+        sleep(uniform(0.1, 0.5))
 
         return verses
     except Exception as e:
