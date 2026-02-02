@@ -5,9 +5,7 @@ import copy
 import os
 from threading import Thread
 import logging
-from time import sleep
 import sys
-from random import uniform
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import re
