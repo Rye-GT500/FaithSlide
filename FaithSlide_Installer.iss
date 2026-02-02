@@ -1,6 +1,6 @@
 [Setup]
 AppName=FaithSlide
-AppVersion=1.2.0-beta
+AppVersion=1.2.1-beta
 DefaultDirName={autopf}\FaithSlide
 DefaultGroupName=FaithSlide
 OutputDir=D:\python\FaitSlide\Output
@@ -19,12 +19,12 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; 請確認此路徑下的檔案名稱與實際檔案完全一致
-Source: "D:\python\FaitSlide\dist\FaithSlide 1.2.0-beta.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\python\FaitSlide\dist\FaithSlide 1.2.1-beta.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\FaithSlide"; Filename: "{app}\FaithSlide 1.2.0-beta.exe"
-Name: "{autodesktop}\FaithSlide"; Filename: "{app}\FaithSlide 1.2.0-beta.exe"; Tasks: desktopicon
+Name: "{group}\FaithSlide"; Filename: "{app}\FaithSlide 1.2.1-beta.exe"
+Name: "{autodesktop}\FaithSlide"; Filename: "{app}\FaithSlide 1.2.1-beta.exe"; Tasks: desktopicon
 
 [Run]
 ; 移除了可能報錯的 skipfsynccheck，保留最穩定的標籤
-Filename: "{app}\FaithSlide 1.2.0-beta.exe"; Description: "{cm:LaunchProgram,FaithSlide}"; Flags: nowait postinstall
+Filename: "{app}\FaithSlide 1.2.1-beta.exe"; Description: "{cm:LaunchProgram,FaithSlide}"; Flags: nowait postinstall
