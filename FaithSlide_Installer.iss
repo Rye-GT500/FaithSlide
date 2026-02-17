@@ -1,6 +1,6 @@
 [Setup]
 AppName=FaithSlide
-AppVersion=1.2.1-beta
+AppVersion=1.2.2-beta
 DefaultDirName={autopf}\FaithSlide
 DefaultGroupName=FaithSlide
 OutputDir=D:\python\FaitSlide\Output
@@ -11,20 +11,21 @@ SolidCompression=yes
 WizardStyle=modern
 
 [Languages]
-; §ï¥Î¹w³]­^¤å¡A½T«O½sÄ¶¦¨¥\
+; ï¿½ï¿½Î¹wï¿½]ï¿½^ï¿½ï¿½Aï¿½Tï¿½Oï¿½sÄ¶ï¿½ï¿½ï¿½\
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "chinesetraditional"; MessagesFile: "compiler:Languages\ChineseTraditional.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; ½Ð½T»{¦¹¸ô®|¤UªºÀÉ®×¦WºÙ»P¹ê»ÚÀÉ®×§¹¥þ¤@­P
-Source: "D:\python\FaitSlide\dist\FaithSlide 1.2.1-beta.exe"; DestDir: "{app}"; Flags: ignoreversion
+; ï¿½Ð½Tï¿½{ï¿½ï¿½ï¿½ï¿½ï¿½|ï¿½Uï¿½ï¿½ï¿½É®×¦Wï¿½Ù»Pï¿½ï¿½ï¿½ï¿½É®×§ï¿½ï¿½ï¿½ï¿½@ï¿½P
+Source: "D:\python\FaitSlide\dist\FaithSlide 1.2.2-beta.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\FaithSlide"; Filename: "{app}\FaithSlide 1.2.1-beta.exe"
-Name: "{autodesktop}\FaithSlide"; Filename: "{app}\FaithSlide 1.2.1-beta.exe"; Tasks: desktopicon
+Name: "{group}\FaithSlide"; Filename: "{app}\FaithSlide 1.2.2-beta.exe"
+Name: "{autodesktop}\FaithSlide"; Filename: "{app}\FaithSlide 1.2.2-beta.exe"; Tasks: desktopicon
 
 [Run]
-; ²¾°£¤F¥i¯à³ø¿ùªº skipfsynccheck¡A«O¯d³ÌÃ­©wªº¼ÐÅÒ
-Filename: "{app}\FaithSlide 1.2.1-beta.exe"; Description: "{cm:LaunchProgram,FaithSlide}"; Flags: nowait postinstall
+; ï¿½ï¿½ï¿½ï¿½ï¿½Fï¿½iï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ skipfsynccheckï¿½Aï¿½Oï¿½dï¿½ï¿½Ã­ï¿½wï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+Filename: "{app}\FaithSlide 1.2.2-beta.exe"; Description: "{cm:LaunchProgram,FaithSlide}"; Flags: nowait postinstall

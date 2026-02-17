@@ -495,7 +495,7 @@ def paragraph_PPT(heading, verses):
         logging.warning(f"paragraph_PPT {e}")
         messagebox.showwarning("錯誤", "段落處理時錯誤")
 #關閉驅動程式
-def close_driver():
+def close_driver(event=None):
     try:
         root.destroy()
     except Exception as e:
@@ -722,7 +722,7 @@ def produce_the_slides():
         return
     messagebox.showinfo("", "製作完成")
 #以另一線程製作PPT
-def Start_produce():
+def Start_produce(event=None):
     Thread(target=produce_the_slides, daemon=True).start()
 #清空UI介面
 def clear_frame(frame_to_clear):
@@ -733,7 +733,7 @@ def clear_frame(frame_to_clear):
         logging.warning(f"clear_frame {e}")
         messagebox.showwarning("錯誤", "清空UI時錯誤")
 #經文搜尋工具
-def run_search():
+def run_search(event=None):
     try:
         book_abbr = book_var.get()
         chapter = chapter_var.get()
@@ -814,6 +814,7 @@ def search_verse_UI():
         verse_entry.grid(row=3, column=1, padx=5, pady=5, sticky="w")
 
         # 查詢按鈕
+        root.bind('<Return>', run_search)
         search_btn = ttk.Button(frame, text="查詢", command=run_search)
         search_btn.grid(row=4, column=0, columnspan=2, pady=(15, 0))
 
@@ -841,6 +842,7 @@ def produce_the_slide_UI():
         ttk.Button(frame, text="選擇儲存", command=select_save_path).grid(row=3, column=1, padx=5, pady=5, sticky="w")
 
         # 按鈕
+        root.bind('<Return>', Start_produce)
         produce_btn = ttk.Button(frame, text="製作", command=Start_produce)
         produce_btn.grid(row=4, column=0, columnspan=2, pady=(15, 0))
 
@@ -858,7 +860,7 @@ def produce_the_slide_UI():
         logging.warning(f"produce_the_slide_UI {e}")
         messagebox.showwarning("錯誤", "PPT創建的UI錯誤")
 #切換頁面
-def change_page():
+def change_page(event=None):
     global search_page
     try:
         clear_frame(frame)
@@ -942,4 +944,6 @@ root.grid_columnconfigure(1, weight=1)   # 讓第二列能擴展 (因為 frame �
 # ----------------------------
 
 if __name__ == "__main__":
+    root.bind('<F5>', change_page)
+    root.bind('<Escape>', close_driver)
     root.mainloop()
