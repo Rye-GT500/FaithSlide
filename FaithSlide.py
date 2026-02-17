@@ -10,6 +10,10 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import re
 import requests
+import webbrowser
+
+CURRENT_VERSION = "1.2.2"
+GITHUB_API_URL = "https://api.github.com/repos/Rye-GT500/FaithSlide/releases/latest"
 
 if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
@@ -918,6 +922,20 @@ def update_progress(current_step, total_tasks, message):
     update_ui_safe(progress_bar.config, value=percent)
     update_ui_safe(status_var.set, f"進度 {percent:.2f}% : {message}")
 
+def check_update():
+    try:
+        # 抓取 GitHub 最新 Release 資訊
+        response = requests.get(GITHUB_API_URL, timeout=5)
+        if response.status_code == 200:
+            latest_data = response.json()
+            latest_version = latest_data['tag_name'].replace('v', '').replace('-beta', '') # 假設 tag 是 v1.2.2
+            
+            if latest_version > CURRENT_VERSION:
+                if messagebox.askyesno("更新通知", f"發現新版本 v{latest_version}！\n是否前往下載？"):
+                    webbrowser.open(latest_data['html_url']) # 開啟瀏覽器跳轉到 Release 頁面
+    except Exception as e:
+        logging.warning(f"檢查更新失敗: {e}")
+
 root = tk.Tk()
 root.title("FaithSlide")
 root.geometry("650x650")
@@ -934,6 +952,7 @@ change_btn.grid(row=1, column=0, pady=(15, 0), sticky="e")
 quit_btn = ttk.Button(root, text="退出", command=close_driver)
 quit_btn.grid(row=1, column=1, pady=(15, 0), sticky="w")
 
+Thread(target=check_update, daemon=True).start()
 produce_the_slide_UI()
 
 # --- 確保 root 的權重配置 ---
