@@ -30,3 +30,5 @@ temp/
 *.exe
 sermon_analysis_test.ipynb
 sermon_analysis_test.py
+# pytest
+.pytest_cache/
