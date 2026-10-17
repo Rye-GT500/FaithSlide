@@ -1,6 +1,6 @@
 # FaithSlide SRP 重構企畫書
 
-> 狀態：**已確認，實施中**（第 0～7 階段完成）
+> 狀態：**已確認，實施中**（第 0～8 階段完成）
 > 範圍：`FaithSlide.py`（967 行，單一檔案）→ `faithslide/` 套件
 > 不在範圍內：`BibleDictionary.py`（由作者自行隔離）
 
@@ -41,6 +41,7 @@ FaitSlide/
 │  ├─ updater.py               檢查 GitHub 最新版本（不碰 UI）
 │  └─ ui/
 │     ├─ __init__.py
+│     ├─ background.py         背景執行緒工作（queue 交回主執行緒）
 │     ├─ main_window.py        主視窗、頁面切換、快捷鍵、啟動更新檢查
 │     ├─ slide_page.py         PPT 製作頁
 │     └─ search_page.py        經文查詢頁
@@ -270,7 +271,7 @@ def generate(word_path: str, ppt_path: str,
 - 無法讀取 Word、範本，或存檔失敗（例如檔案正在 PowerPoint 中開啟）：拋出 `GenerationError`。
 - 單一引用格式錯誤、查無章節、節數超出本章：記錄於 `GenerationResult.warnings` 並略過，繼續製作。同一範圍的超出節數只警告一次。
 - 已驗證：snapshot 測試改為以 pipeline 產生（離線），4 份與基準完全一致、無警告；另以實際 API 連網執行，結果相同。
-- 第 7 階段結束時，程式介面仍使用舊的 `produce_the_slides`；第 8 階段改接 pipeline，並移除 `FaithSlide.py`、`tests/legacy_runner.py`、`tests/make_baseline.py`（基準已凍結，API 錄製資料保留）。
+- 第 8 階段已改接 pipeline，並移除 `FaithSlide.py`、`tests/legacy_runner.py`、`tests/make_baseline.py`（基準已凍結，API 錄製資料保留）。刻意改變輸出時，以 `python -m tests.update_snapshots` 重新產生 snapshot。
 
 - 投影片順序：讀經經文 → 主標題（2 張）→ **主標題後的引用經文**（作者決定：偶爾會出現，予以製作）→ 各大標題、其引用 → 各中標題、其引用 → 各小標題、其引用。
 - 證道經文去除空白後再放入投影片（沿用舊版）。
@@ -290,10 +291,11 @@ def check() -> UpdateInfo | None    # 失敗或無新版都回傳 None，並記�
 
 ### 4.9 `ui/`
 
-- `main_window.py`：建立 `Tk`、頁面切換（F5）、退出（Esc）。啟動時以背景執行緒呼叫 `updater.check()`，再用 `root.after` 回到主執行緒顯示對話框。
-- `slide_page.py`：檔案選擇、進度條。背景執行緒呼叫 `pipeline.generate`，`on_progress` 與錯誤處理一律經 `root.after` 轉回主執行緒。
-- `search_page.py`：單一輸入框，見第 9 階段。
-- 啟動時若 `bible_books.rejected_aliases()` 不為空，顯示通知。
+- `background.py`：`run_in_background(widget, work, on_done, on_error, on_progress)`。背景執行緒只把進度與結果放入 `queue`，主執行緒以 `after` 定時取出處理，Tk 元件只在主執行緒操作。（舊版從背景執行緒呼叫 `root.after`，tkinter 不保證安全；冒煙測試中確實會失敗。）
+- `main_window.py`：建立 `Tk`、頁面切換（F5）、退出（Esc）、Enter 交給目前頁面。兩頁同時建立、切換時只顯示其中一頁，輸入內容不會因切換而消失。啟動時以 `run_in_background` 呼叫 `updater.check()`。
+- `slide_page.py`：檔案選擇、進度條。製作前檢查是否已選擇檔案；製作中停用「製作」按鈕，避免重複執行。完成時若有警告，列出前 10 則。
+- `search_page.py`：第 8 階段維持書卷 / 章 / 節三個欄位（改用 `bible_books` 與 `bible_api`），第 9d 階段改為單一輸入框。
+- 啟動時若 `bible_books.rejected_aliases()` 不為空，顯示通知（第 9c 階段）。
 - **所有 `messagebox` 呼叫只存在於 `ui/`。**
 
 ---
@@ -340,8 +342,8 @@ log 設定在 `main.py` 統一初始化一次，各模組使用 `logging.getLogg
 
 ### 打包同步（第 8 階段完成後）
 
-- PyInstaller：進入點改為 `main.py`，並加上 `--add-data "faithslide/data/books.default.json;faithslide/data"`。
-- 版本號目前散落在 `FaithSlide.py`、`PyInstaller.txt`、`FaithSlide_Installer.iss` 三處 → 以 `version.py` 為準。可選：寫一個小 build 腳本自動帶入版本號。
+- PyInstaller：進入點已改為 `main.py`，並加上 `--add-data "faithslide/data;faithslide/data"`（已完成）。
+- 版本號目前在 `version.py`、`PyInstaller.txt`、`FaithSlide_Installer.iss` 三處 → 以 `version.py` 為準，build 腳本見「後續討論」。
 
 ---
 

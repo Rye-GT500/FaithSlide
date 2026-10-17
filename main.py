@@ -14,6 +14,5 @@ def setup_logging():
 
 if __name__ == "__main__":
     setup_logging()
-    # 過渡期：UI 仍在 FaithSlide.py，第 8 階段改為啟動 faithslide.ui
-    import FaithSlide
-    FaithSlide.run()
+    from faithslide.ui.main_window import MainWindow
+    MainWindow().run()

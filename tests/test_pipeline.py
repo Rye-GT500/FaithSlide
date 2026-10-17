@@ -99,5 +99,16 @@ def test_unreadable_word_file(tmp_path):
 
 def test_unwritable_output(tmp_path, chapters):
     docx = make_report(tmp_path / "in.docx", [("讀經", READING)])
-    with pytest.raises(GenerationError, match="無法儲存"):
+    with pytest.raises(GenerationError, match="無法儲存") as error:
         pipeline.generate(docx, str(tmp_path / "no_such_dir" / "out.pptx"))
+    assert "PowerPoint" not in str(error.value)
+
+
+def test_output_locked_by_powerpoint(tmp_path, chapters, monkeypatch):
+    docx = make_report(tmp_path / "in.docx", [("讀經", READING)])
+
+    def locked(self, path):
+        raise PermissionError(13, "Permission denied", path)
+    monkeypatch.setattr(pipeline.SlideBuilder, "save", locked)
+    with pytest.raises(GenerationError, match="PowerPoint 中開啟"):
+        pipeline.generate(docx, str(tmp_path / "out.pptx"))

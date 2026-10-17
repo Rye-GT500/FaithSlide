@@ -59,9 +59,12 @@ def generate(word_path: str, ppt_path: str,
 
     try:
         builder.save(ppt_path)
+    except PermissionError as e:
+        logger.exception(f"存檔失敗：{ppt_path}")
+        raise GenerationError(f"無法儲存 PPT，檔案可能正在 PowerPoint 中開啟，請關閉後再試：{ppt_path}") from e
     except OSError as e:
         logger.exception(f"存檔失敗：{ppt_path}")
-        raise GenerationError(f"無法儲存 PPT，檔案可能正在 PowerPoint 中開啟：{e}") from e
+        raise GenerationError(f"無法儲存 PPT：{e}") from e
     on_progress(1.0, "製作完畢")
     logger.info(f"製作完成：{ppt_path}，警告 {len(result.warnings)} 則")
     return result
