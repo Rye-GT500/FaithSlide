@@ -134,16 +134,24 @@ def test_wrap_lines_width_follows_number_column():
     assert lines == ["一二三四五六七八九十甲", "乙丙丁戊"]
 
 
-def test_wrap_lines_one_closing_punctuation_hangs():
-    # 第 12 個字是「，」：懸掛在行尾，不換行
+def test_wrap_lines_closing_punctuation_moves_with_previous_char():
+    # 第 12 個字是「，」放不下：不懸掛到右邊界外，連同前一個字「甲」移到下一行（以弗所書 2:2 的情況）
     lines = wrap_lines("16.", "一二三四五六七八九十甲，乙丙", Pt(72))
-    assert lines == ["一二三四五六七八九十甲，", "乙丙"]
+    assert lines == ["一二三四五六七八九十", "甲，乙丙"]
 
 
-def test_wrap_lines_second_closing_punctuation_moves_with_previous_char():
-    # 「。」懸掛後「」」也放不下：連同前一個字「甲」移到下一行，避免下一行以標點開頭
+def test_wrap_lines_consecutive_closing_punctuation_moves_together():
     lines = wrap_lines("16.", "一二三四五六七八九十甲。」乙", Pt(72))
     assert lines == ["一二三四五六七八九十", "甲。」乙"]
+
+
+def test_verse_paragraph_disables_hanging_punctuation(tmp_path):
+    """範本開啟了標點懸掛；經文段落要關閉，否則行尾標點會跑出投影片、第一行也會被壓縮。"""
+    from pptx import Presentation
+    from pptx.oxml.ns import qn
+    out, _ = build(tmp_path, lambda b: b.add_verse("標題", Verse(2, "那時，你們在其中行事為人，隨從今世的風俗")))
+    pPr = Presentation(str(out)).slides[0].shapes[1].text_frame.paragraphs[0]._p.find(qn("a:pPr"))
+    assert pPr.get("hangingPunct") == "0"
 
 
 def test_wrap_lines_opening_punctuation_not_left_at_line_end():

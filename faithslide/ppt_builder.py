@@ -38,7 +38,7 @@ _FONT_SIZE_STEP = 0.5
 _LINE_HEIGHT_EM = 1.2                  # 行高 = 字體大小 × 1.2
 _FIT_MARGIN_EM = 0.01                  # 剛好放滿時 PowerPoint 可能因捨入而換行，保守預留
 _INSET_X, _INSET_Y = Pt(7.2), Pt(3.6)  # PowerPoint 預設的文字框內距（範本未另外設定）
-# 可以懸掛在行尾右邊界外、不會被移到下一行開頭的標點（範本開啟了標點懸掛）
+# 不可放在行首的結束標點：放不下時連同前一個字一起換行
 _CLOSING_PUNCTUATION = set("，。、；：？！」』）》〉】〕”’…,.;:?!)")
 # 不可留在行尾、會跟著下一個字換行的標點
 _NO_LINE_END = set(_OPENING_PUNCTUATION)
@@ -182,6 +182,9 @@ def _set_hanging_indent(paragraph, column: int, tab_position: int) -> None:
     pPr = paragraph._p.get_or_add_pPr()
     pPr.set("marL", str(column))
     pPr.set("indent", str(-column))
+    # 範本開啟了標點懸掛：行尾的「，」會掛到右邊界外（甚至超出投影片），PowerPoint 還會壓縮整行、
+    # 吃掉 Tab 的位置，讓第一行與其他行對不齊。關閉後由 wrap_lines 把標點連同前一個字移到下一行。
+    pPr.set("hangingPunct", "0")
     for old in pPr.findall(qn("a:tabLst")):
         pPr.remove(old)
     tab_list = OxmlElement("a:tabLst")
@@ -208,26 +211,21 @@ def wrap_lines(number: str, text: str, size: Length, area: TextArea = DEFAULT_TE
     """模擬 PowerPoint 的換行，回傳每一行的經文（不含節數）。
 
     - 第一行從 Tab 位置開始，之後各行從經文欄開始。
-    - 行尾放不下的結束標點（，。」等）可以懸掛在右邊界外，但每行只能懸掛一個；
-      第二個也放不下時（如「子。」」），連同前一個字一起移到下一行，避免下一行以標點開頭。
+    - 經文段落關閉了標點懸掛：行尾放不下的結束標點（，。」等）連同前一個字一起移到下一行，
+      避免下一行以標點開頭，也不會有標點跑到右邊界外。
     - 開頭標點（「等）不留在行尾，跟著下一個字換行。
     """
     column, tab = _verse_indent(number, text, size)
     limit = (area.width - tab) / size
-    lines, line, used, hanging = [], "", 0.0, False
+    lines, line, used = [], "", 0.0
     for char in text:
         width = _char_width_em(char)
         if used + width <= limit - _FIT_MARGIN_EM:
             line += char
             used += width
             continue
-        if char in _CLOSING_PUNCTUATION and line and not hanging:
-            line += char
-            used += width
-            hanging = True
-            continue
         if char in _CLOSING_PUNCTUATION:
-            # 已經有標點懸掛：把行尾的標點連同前一個字移到下一行
+            # 把行尾連續的結束標點與它前面的一個字，一起移到下一行
             split = len(line)
             while split > 0 and line[split - 1] in _CLOSING_PUNCTUATION:
                 split -= 1
@@ -240,7 +238,6 @@ def wrap_lines(number: str, text: str, size: Length, area: TextArea = DEFAULT_TE
         line = line[split:] + char
         used = sum(_char_width_em(c) for c in line)
         limit = (area.width - column) / size
-        hanging = False
     lines.append(line)
     return lines
 
