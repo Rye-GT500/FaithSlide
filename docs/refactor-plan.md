@@ -1,6 +1,6 @@
 # FaithSlide SRP 重構企畫書
 
-> 狀態：**已確認，實施中**（第 0、1 階段完成）
+> 狀態：**已確認，實施中**（第 0～2 階段完成）
 > 範圍：`FaithSlide.py`（967 行，單一檔案）→ `faithslide/` 套件
 > 不在範圍內：`BibleDictionary.py`（由作者自行隔離）
 
