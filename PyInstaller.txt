@@ -1,1 +1,1 @@
-pyinstaller --onefile --noconsole --add-data "template.pptx;." --icon="icon.ico" --name "FaithSlide 1.2.2-beta" FaithSlide.py
+pyinstaller --onefile --noconsole --add-data "template.pptx;." --icon="icon.ico" --name "FaithSlide 1.2.2-beta" main.py

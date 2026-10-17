@@ -1,6 +1,6 @@
 # FaithSlide SRP 重構企畫書
 
-> 狀態：**草案，待確認**
+> 狀態：**已確認，實施中**（第 0、1 階段完成）
 > 範圍：`FaithSlide.py`（967 行，單一檔案）→ `faithslide/` 套件
 > 不在範圍內：`BibleDictionary.py`（由作者自行隔離）
 
@@ -28,7 +28,9 @@ FaitSlide/
 │  ├─ version.py               CURRENT_VERSION、GITHUB_API_URL（版本唯一來源）
 │  ├─ paths.py                 資源路徑（_MEIPASS）、使用者資料夾（%APPDATA%\FaithSlide）、log 路徑
 │  ├─ data/
-│  │  └─ books.default.json    內建書卷資料（唯讀，打包進程式）
+│  │  ├─ books.default.json    內建書卷資料（唯讀，打包進程式）
+│  │  └─ settings.default.json 內建設定（唯讀，打包進程式），如講員名稱清單
+│  ├─ settings.py              設定載入：預設設定 + 使用者設定
 │  ├─ bible_books.py           書卷資料載入、合併使用者別名、名稱解析、書名 pattern 生成
 │  ├─ reference_parser.py      經文引用：尋找、解析、顯示格式（含中文數字）
 │  ├─ bible_api.py             fhl API 查詢
@@ -51,7 +53,7 @@ FaitSlide/
    └─ refactor-plan.md         本文件
 ```
 
-使用者自訂檔（不在 repo 內）：`%APPDATA%\FaithSlide\books.user.json`
+使用者自訂檔（不在 repo 內）：`%APPDATA%\FaithSlide\books.user.json`、`%APPDATA%\FaithSlide\settings.json`
 
 ---
 
@@ -70,7 +72,7 @@ ui ──► pipeline ──► word_reader
 規則：
 
 - 箭頭只能往右或往下，**核心模組不得 import `ui` 或 `tkinter`**。
-- `version.py`、`paths.py` 任何模組都可以引用。
+- `version.py`、`paths.py`、`settings.py` 任何模組都可以引用。
 
 ---
 
@@ -116,12 +118,15 @@ def reload() -> None                     # 設定變更後呼叫
 def all_books() -> list[Book]
 def resolve(name: str) -> Book | None    # 接受 full / abbr / alias
 def name_pattern() -> str                # 依長度遞減排序、re.escape 後以 | 串接
-def save_user_aliases(changes) -> None
+def save_user_aliases(changes) -> None   # 有衝突時拋出 AliasConflictError，不寫入
+def rejected_aliases() -> list[AliasConflict]   # load 時被拒絕的使用者別名，供 UI 通知
 ```
 
 **驗證規則**
 
-- 同一名稱對應到多卷書：拒絕該別名，並記錄 log。
+- 同一名稱對應到多卷書：**直接拒絕並通知**。
+  - 儲存時：拋出 `AliasConflictError`（列出衝突的別名與書卷），不寫入檔案，由設定 UI 顯示。
+  - 載入時（例如使用者手動編輯了 JSON）：略過衝突的別名，其餘照常載入；UI 啟動後讀取 `rejected_aliases()` 顯示通知。
 - 使用者檔損毀：記錄 log，只使用預設表，程式照常啟動。
 - 常用字別名（如「主」、「神」）：由設定 UI 顯示警告，不在此層阻擋。
 
@@ -191,12 +196,12 @@ class Sermon:
     title: str
     sections: list[Section]
 
-def parse_sermon(text: str, default_book: Book | None) -> Sermon
+def parse_sermon(text: str, default_book: Book | None, speaker_words: list[str]) -> Sermon
 def parse_reading(lines: list[str]) -> ...        # 讀經段落解析（主經文、書卷推斷）
 ```
 
 - **標題切分正則**（`一、` / `1.` / `1)`）放在這裡。
-- 要移除的講員字串（`證道`、`牧師`、人名…）改成模組常數；之後可考慮移到設定檔。
+- 要移除的講員字串（`證道`、`牧師`、人名…）**移到設定檔**（`settings.default.json` 的 `speaker_words`，使用者可在 `settings.json` 覆寫），由呼叫端傳入 `parse_sermon`，parser 本身不讀檔。
 
 **取代的現有程式碼**：`analyze_word`、`produce_the_slides` 中的大綱建構與讀經解析段落。
 
@@ -244,7 +249,8 @@ def check() -> UpdateInfo | None    # 失敗或無新版都回傳 None，並記�
 
 - `main_window.py`：建立 `Tk`、頁面切換（F5）、退出（Esc）。啟動時以背景執行緒呼叫 `updater.check()`，再用 `root.after` 回到主執行緒顯示對話框。
 - `slide_page.py`：檔案選擇、進度條。背景執行緒呼叫 `pipeline.generate`，`on_progress` 與錯誤處理一律經 `root.after` 轉回主執行緒。
-- `search_page.py`：見第 9 階段。
+- `search_page.py`：單一輸入框，見第 9 階段。
+- 啟動時若 `bible_books.rejected_aliases()` 不為空，顯示通知。
 - **所有 `messagebox` 呼叫只存在於 `ui/`。**
 
 ---
@@ -272,7 +278,7 @@ log 設定在 `main.py` 統一初始化一次，各模組使用 `logging.getLogg
 | **2. 書卷資料** | `books.default.json`、`bible_books.py`（先不做使用者檔） | 單元測試：resolve、pattern 排序、衝突偵測 |
 | **3. 引用解析** | `reference_parser.py` | 單元測試涵蓋 README 範例與現有格式 |
 | **4. 經文 API** | `bible_api.py` | 以錄製回應做離線測試 |
-| **5. Word / 證道** | `word_reader.py`、`sermon_parser.py` | 大綱結構測試 |
+| **5. Word / 證道** | `settings.py` + `settings.default.json`（講員名稱）、`word_reader.py`、`sermon_parser.py` | 大綱結構測試 |
 | **6. PPT** | `ppt_builder.py` | — |
 | **7. 串接** | `pipeline.py` | **snapshot 與基準完全一致** |
 | **8. UI** | `ui/` 三個檔案，`main.py` 改為啟動新 UI；刪除 `FaithSlide.py` | 手動測試兩個頁面與快捷鍵 |
@@ -285,7 +291,7 @@ log 設定在 `main.py` 統一初始化一次，各模組使用 `logging.getLogg
 | 9a. 版本比較修正 | 字串比較 → 數值比較 |
 | 9b. log 位置 | exe 旁 → `%APPDATA%\FaithSlide\FaithSlide.log`（安裝在 Program Files 時無寫入權限）；README 的回報說明需同步更新 |
 | 9c. 使用者自訂別名 | `books.user.json` 讀寫 + 設定 UI |
-| 9d. 查詢頁單一輸入框 | 輸入 `約3:16-18` → `parse` → 依（書卷, 章）分組查詢 → 依 ranges 篩選顯示 |
+| 9d. 查詢頁單一輸入框 | 移除書卷下拉選單與章、節欄位。輸入框接受全名、簡寫或別名（如 `約3:16-18`、`約翰福音3:16`）→ `parse` → 依（書卷, 章）分組查詢 → 依 ranges 篩選顯示 |
 
 ### 打包同步（第 8 階段完成後）
 
@@ -302,11 +308,8 @@ log 設定在 `main.py` 統一初始化一次，各模組使用 `logging.getLogg
 - 暫不支援跨章引用。
 - 更新檢查拆成 `updater.py`（邏輯）與 UI（對話框）。
 - `BibleDictionary.py` 由作者自行隔離，不在本計畫範圍內。
-
-## 8. 待確認事項
-
-1. **測試框架**：建議使用 `pytest`（需加入開發依賴）。
-2. **查詢頁**：是否保留書卷下拉選單作為輔助輸入？
-3. **別名衝突**：直接拒絕，還是允許但警告？（目前草案：拒絕）
-4. **講員名稱清單**（`吳佩倫`、`錢致榮`…）：先放模組常數，還是直接移到設定檔？
-5. **第 0 階段**會執行現行程式來處理範例週報並產生 PPT。腳本是以程式擷取文字存成 JSON，我不會直接開啟 docx 或 pptx 檔，這樣可以嗎？
+- 測試框架使用 `pytest`。
+- 查詢頁只用單一輸入框，接受全名、簡寫或別名，不保留下拉選單。
+- 別名衝突：直接拒絕並通知使用者。
+- 講員名稱清單移到設定檔。
+- 第 0 階段以腳本執行現行程式並擷取 JSON 作為基準（已完成）。

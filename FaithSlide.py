@@ -2,34 +2,17 @@ from docx import Document
 from pptx import Presentation
 from pptx.util import Pt
 import copy
-import os
 from threading import Thread
 import logging
-import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import re
 import requests
 import webbrowser
+from faithslide import paths
+from faithslide.version import CURRENT_VERSION, GITHUB_API_URL
 
-CURRENT_VERSION = "1.2.2"
-GITHUB_API_URL = "https://api.github.com/repos/Rye-GT500/FaithSlide/releases/latest"
-
-if getattr(sys, 'frozen', False):
-    base_path = sys._MEIPASS
-    exe_dir = os.path.dirname(sys.executable)
-    log_path = os.path.join(exe_dir, "FaithSlide.log")
-else:
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    log_path = os.path.join(base_path, "FaithSlide.log")
-
-logging.basicConfig(
-    filename=log_path,
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    encoding="utf-8"
-)
-template_ppt_file = os.path.join(base_path, "template.pptx")
+template_ppt_file = paths.TEMPLATE_PPTX
 
 prs = None
 book_var = None
@@ -962,7 +945,7 @@ root.grid_columnconfigure(0, weight=1)   # 讓第一列能擴展
 root.grid_columnconfigure(1, weight=1)   # 讓第二列能擴展 (因為 frame 跨越了兩列)
 # ----------------------------
 
-if __name__ == "__main__":
+def run():
     root.bind('<F5>', change_page)
     root.bind('<Escape>', close_driver)
     root.mainloop()
