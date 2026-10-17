@@ -16,6 +16,7 @@ ISCC_CANDIDATES = [
     Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"),
     Path(r"C:\Program Files\Inno Setup 6\ISCC.exe"),
 ]
+GH_CANDIDATES = [Path(r"C:\Program Files\GitHub CLI\gh.exe")]
 APP_NAME = "FaithSlide"
 
 LEVELS = ["none", "patch", "minor", "major"]
@@ -139,14 +140,19 @@ def confirm(question: str, assume_yes: bool) -> bool:
     return input(f"{question} [y/N] ").strip().lower() in ("y", "yes")
 
 
-def find_iscc() -> Path:
-    for path in ISCC_CANDIDATES:
-        if path.exists():
-            return path
-    found = shutil.which("ISCC")
+def find_tool(name: str, candidates: list[Path]) -> Path | None:
+    """先找 PATH，再找預設安裝位置（剛安裝完時，已開啟的終端機 PATH 尚未更新）。"""
+    found = shutil.which(name)
     if found:
         return Path(found)
-    raise BuildError("找不到 Inno Setup 的 ISCC.exe，請先安裝 Inno Setup 6")
+    return next((path for path in candidates if path.exists()), None)
+
+
+def find_iscc() -> Path:
+    iscc = find_tool("ISCC", ISCC_CANDIDATES)
+    if not iscc:
+        raise BuildError("找不到 Inno Setup 的 ISCC.exe，請先安裝 Inno Setup 6")
+    return iscc
 
 
 def commits_since_last_tag(runner) -> tuple[str | None, list[Commit]]:
@@ -219,10 +225,11 @@ def main(argv=None):
         raise BuildError("工作目錄有未 commit 的變更（可用 --allow-dirty 略過）")
     find_iscc()
     if release:
-        if not shutil.which("gh"):
+        gh = find_tool("gh", GH_CANDIDATES)
+        if not gh:
             raise BuildError("找不到 GitHub CLI（gh），請先安裝並執行 gh auth login，或改用 --no-release")
         repo = github_repo(version_text)
-        runner.run("gh", "auth", "status", side_effect=False)
+        runner.run(gh, "auth", "status", side_effect=False)
     if not args.no_git:
         git(runner, "fetch", "--tags", "--quiet", side_effect=False)
 
@@ -273,7 +280,7 @@ def main(argv=None):
     with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as notes:
         notes.write(notes_text)
     try:
-        gh_args = ["gh", "release", "create", tag, installer, "--repo", repo,
+        gh_args = [gh, "release", "create", tag, installer, "--repo", repo,
                    "--title", f"{APP_NAME} {version}", "--notes-file", notes.name]
         if "-" in version:
             gh_args.append("--prerelease")

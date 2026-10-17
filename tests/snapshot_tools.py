@@ -3,11 +3,14 @@ import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
+SAMPLES_DIR = REPO_ROOT / "samples"
 SNAPSHOT_DIR = Path(__file__).parent / "fixtures" / "snapshots"
 
 
 def sample_reports() -> list[Path]:
-    return sorted(REPO_ROOT.glob("*週報.docx"))
+    reports = sorted(SAMPLES_DIR.glob("*.docx"))
+    assert reports, f"找不到範例週報：{SAMPLES_DIR}"
+    return reports
 
 
 def snapshot_path(docx_path: Path) -> Path:
