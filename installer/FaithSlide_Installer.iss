@@ -42,4 +42,5 @@ Name: "{group}\FaithSlide"; Filename: "{app}\FaithSlide.exe"
 Name: "{autodesktop}\FaithSlide"; Filename: "{app}\FaithSlide.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\FaithSlide.exe"; Description: "{cm:LaunchProgram,FaithSlide}"; Flags: nowait postinstall
+; 一鍵更新以 /SILENT 執行時也會自動重新開啟；以一般使用者權限開啟，而非安裝程式的系統管理員權限
+Filename: "{app}\FaithSlide.exe"; Description: "{cm:LaunchProgram,FaithSlide}"; Flags: nowait postinstall runasoriginaluser

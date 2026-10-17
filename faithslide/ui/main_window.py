@@ -1,15 +1,15 @@
 """主視窗：頁面切換（F5）、退出（Esc）、右上角齒輪開啟設定、啟動時檢查更新。"""
 import logging
 import tkinter as tk
-import webbrowser
 from tkinter import messagebox, ttk
 
 from faithslide import bible_books, updater
 from faithslide.ui.background import run_in_background
 from faithslide.ui.search_page import SearchPage
 from faithslide.ui.settings_dialog import SettingsDialog
-from faithslide.ui.tooltip import Tooltip
 from faithslide.ui.slide_page import SlidePage
+from faithslide.ui.tooltip import Tooltip
+from faithslide.ui.update_dialog import UpdateDialog
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class MainWindow:
         ttk.Style(self.root).configure("Gear.TButton", font=("Segoe UI Symbol", 14))
         gear = ttk.Button(top_bar, text="⚙", width=3, style="Gear.TButton", command=self.open_settings)
         gear.pack(side="right")
-        Tooltip(gear, "設定（書卷別名、講員）")
+        Tooltip(gear, "設定（書卷別名、講員、檢查更新、記錄檔）")
 
         container = ttk.Frame(self.root, padding=(20, 0, 20, 20))
         container.grid(row=1, column=0, sticky="nsew")
@@ -60,7 +60,10 @@ class MainWindow:
         self._show_page(1 - self.current)
 
     def open_settings(self):
-        SettingsDialog(self.root)
+        SettingsDialog(self.root, self.show_update)
+
+    def show_update(self, info, parent=None):
+        UpdateDialog(parent or self.root, info, on_install_started=self.close)
 
     def _notify_load_warnings(self):
         warnings = bible_books.load_warnings()
@@ -81,10 +84,6 @@ class MainWindow:
         run_in_background(
             self.root,
             lambda report_progress: updater.check(),
-            on_done=self._ask_update,
+            on_done=lambda info: info and self.show_update(info),
             on_error=lambda error: logger.error("檢查更新失敗", exc_info=error),
         )
-
-    def _ask_update(self, info):
-        if info and messagebox.askyesno("更新通知", f"發現新版本 v{info.version}！\n是否前往下載？"):
-            webbrowser.open(info.url)

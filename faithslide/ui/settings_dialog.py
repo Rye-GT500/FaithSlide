@@ -2,12 +2,14 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from faithslide.ui.about_tab import AboutTab
 from faithslide.ui.alias_tab import AliasTab
 from faithslide.ui.speaker_tab import SpeakerTab
 
 
 class SettingsDialog(tk.Toplevel):
-    def __init__(self, parent):
+    def __init__(self, parent, on_update_found):
+        """on_update_found(info, parent)：在「關於」分頁手動檢查到新版時呼叫。"""
         super().__init__(parent)
         self.title("設定")
         self.geometry("460x520")
@@ -16,7 +18,8 @@ class SettingsDialog(tk.Toplevel):
 
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=(10, 0))
-        self.tabs = [AliasTab(self.notebook), SpeakerTab(self.notebook)]
+        self.tabs = [AliasTab(self.notebook), SpeakerTab(self.notebook),
+                     AboutTab(self.notebook, lambda info: on_update_found(info, self))]
         for tab in self.tabs:
             self.notebook.add(tab, text=tab.title)
 
