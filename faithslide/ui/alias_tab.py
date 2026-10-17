@@ -1,62 +1,49 @@
-"""書卷別名設定視窗。"""
+"""設定視窗：書卷別名分頁。"""
 import tkinter as tk
 from tkinter import messagebox, ttk
 
 from faithslide import bible_books
 
 
-class AliasDialog(tk.Toplevel):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.title("書卷別名設定")
-        self.geometry("420x460")
-        self.transient(parent)
-        self.grab_set()   # 開啟期間主視窗不可操作
+class AliasTab(ttk.Frame):
+    title = "書卷別名"
 
+    def __init__(self, parent):
+        super().__init__(parent, padding=15)
         self.books = bible_books.all_books()
         self.defaults = {b.id: b.aliases for b in bible_books.default_books()}
-        self.working = {b.id: list(b.aliases) for b in self.books}   # 編輯中的別名，儲存前不生效
+        self.saved = {b.id: list(b.aliases) for b in self.books}
+        self.working = {book_id: list(aliases) for book_id, aliases in self.saved.items()}   # 儲存前不生效
 
-        body = ttk.Frame(self, padding=15)
-        body.pack(fill="both", expand=True)
-        body.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
-        ttk.Label(body, text="書卷：").grid(row=0, column=0, sticky="w")
-        self.book_var = tk.StringVar()
-        self.book_combo = ttk.Combobox(body, textvariable=self.book_var, state="readonly",
-                                       values=[f"{b.full}（{b.abbr}）" for b in self.books])
+        ttk.Label(self, text="書卷：").grid(row=0, column=0, sticky="w")
+        self.book_combo = ttk.Combobox(self, state="readonly", values=[f"{b.full}（{b.abbr}）" for b in self.books])
         self.book_combo.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         self.book_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh())
 
-        self.abbr_label = ttk.Label(body, foreground="gray")
+        self.abbr_label = ttk.Label(self, foreground="gray")
         self.abbr_label.grid(row=2, column=0, columnspan=2, sticky="w")
 
-        self.alias_list = tk.Listbox(body, height=8)
+        self.alias_list = tk.Listbox(self, height=8)
         self.alias_list.grid(row=3, column=0, sticky="nsew", pady=5)
-        side = ttk.Frame(body)
+        side = ttk.Frame(self)
         side.grid(row=3, column=1, sticky="n", padx=(8, 0), pady=5)
         ttk.Button(side, text="移除所選", command=self.remove_selected).pack(fill="x")
         ttk.Button(side, text="還原預設", command=self.restore_default).pack(fill="x", pady=(5, 0))
-        body.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(3, weight=1)
 
         self.new_alias_var = tk.StringVar()
-        entry = ttk.Entry(body, textvariable=self.new_alias_var)
+        entry = ttk.Entry(self, textvariable=self.new_alias_var)
         entry.grid(row=4, column=0, sticky="ew", pady=5)
         entry.bind("<Return>", lambda e: self.add())
-        ttk.Button(body, text="新增", command=self.add).grid(row=4, column=1, sticky="ew", padx=(8, 0), pady=5)
+        ttk.Button(self, text="新增", command=self.add).grid(row=4, column=1, sticky="ew", padx=(8, 0), pady=5)
 
-        ttk.Label(body, text="別名可用於證道經文引用與經文查詢，不可與其他書卷的名稱重複。",
-                  foreground="gray", wraplength=380).grid(row=5, column=0, columnspan=2, sticky="w", pady=(5, 10))
-
-        buttons = ttk.Frame(body)
-        buttons.grid(row=6, column=0, columnspan=2)
-        ttk.Button(buttons, text="儲存", command=self.save).pack(side="left", padx=5)
-        ttk.Button(buttons, text="取消", command=self.destroy).pack(side="left", padx=5)
-        self.bind("<Escape>", lambda e: self.destroy())
+        ttk.Label(self, text="別名可用於週報的經文引用與經文查詢，不可與其他書卷的名稱重複。",
+                  foreground="gray", wraplength=380).grid(row=5, column=0, columnspan=2, sticky="w", pady=(5, 0))
 
         self.book_combo.current(0)
         self.refresh()
-        entry.focus_set()
 
     @property
     def book(self) -> bible_books.Book:
@@ -101,15 +88,19 @@ class AliasDialog(tk.Toplevel):
         self.working[self.book.id] = list(self.defaults[self.book.id])
         self.refresh()
 
-    def save(self):
+    def has_changes(self) -> bool:
+        return self.working != self.saved
+
+    def save(self) -> bool:
+        """儲存失敗時顯示原因並回傳 False。"""
         try:
             bible_books.save_user_aliases(self.working)
         except bible_books.AliasConflictError as e:
             details = "\n".join(f"・{r}" for r in e.rejected)
-            messagebox.showwarning("無法儲存", f"以下別名有問題，未儲存任何變更：\n{details}", parent=self)
-            return
+            messagebox.showwarning("無法儲存", f"以下書卷別名有問題，未儲存：\n{details}", parent=self)
+            return False
         except OSError as e:
-            messagebox.showwarning("無法儲存", f"寫入設定檔失敗：{e}", parent=self)
-            return
-        messagebox.showinfo("已儲存", "書卷別名已儲存並立即生效", parent=self)
-        self.destroy()
+            messagebox.showwarning("無法儲存", f"寫入書卷別名設定失敗：{e}", parent=self)
+            return False
+        self.saved = {book_id: list(aliases) for book_id, aliases in self.working.items()}
+        return True

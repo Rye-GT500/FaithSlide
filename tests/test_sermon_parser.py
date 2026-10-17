@@ -134,3 +134,19 @@ def test_full_names_are_not_substrings_of_each_other():
     # find_book_in 依賴這個性質；新增書卷資料時若被打破，需要重新檢查
     names = [b.full for b in bible_books.all_books()]
     assert [(a, b) for a in names for b in names if a != b and a in b] == []
+
+
+@pytest.mark.parametrize("word, ok", [
+    ("牧師", True), ("王小明", True), ("Pastor Lee", True),
+    ("", False), ("主", False), ("第1堂", False), ("一、", False), ("講員:", False),
+])
+def test_speaker_word_problem(word, ok):
+    from faithslide.sermon_parser import speaker_word_problem
+    assert (speaker_word_problem(word) is None) == ok
+
+
+def test_saved_speaker_words_used_by_pipeline_settings():
+    from faithslide import settings
+    settings.save("speaker_words", ["王小明"])
+    sermon = parse_sermon("主標題 王小明 一、大標題", settings.get("speaker_words"))
+    assert sermon.title == "主標題"

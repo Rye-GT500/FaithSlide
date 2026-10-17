@@ -41,7 +41,10 @@ FaitSlide/
 │  ├─ updater.py               檢查 GitHub 最新版本（不碰 UI）
 │  └─ ui/
 │     ├─ __init__.py
-│     ├─ alias_dialog.py       書卷別名設定視窗
+│     ├─ settings_dialog.py    設定視窗（右上角齒輪），分頁：
+│     ├─ alias_tab.py            書卷別名
+│     ├─ speaker_tab.py          講員
+│     ├─ tooltip.py            滑鼠提示
 │     ├─ background.py         背景執行緒工作（queue 交回主執行緒）
 │     ├─ main_window.py        主視窗、頁面切換、快捷鍵、啟動更新檢查
 │     ├─ slide_page.py         PPT 製作頁
@@ -301,7 +304,7 @@ def check() -> UpdateInfo | None    # 失敗或無新版都回傳 None，並記�
 - `main_window.py`：建立 `Tk`、頁面切換（F5）、退出（Esc）、Enter 交給目前頁面。兩頁同時建立、切換時只顯示其中一頁，輸入內容不會因切換而消失。啟動時以 `run_in_background` 呼叫 `updater.check()`。
 - `slide_page.py`：檔案選擇、進度條。製作前檢查是否已選擇檔案；製作中停用「製作」按鈕，避免重複執行。完成時若有警告，列出前 10 則。
 - `search_page.py`：單一輸入框（9d），接受全名、簡寫或別名，多段以「；」分隔，整章可省略節數。每個範圍顯示一個標題；不存在的節數以對話框提示。查詢邏輯 `lookup()` 不依賴 Tk，可單獨測試。
-- `alias_dialog.py`（9c）：主視窗「書卷別名」按鈕開啟。可新增、移除、還原預設；新增時即時檢查，單字別名需確認；儲存後立即生效。
+- `settings_dialog.py`：主視窗右上角 ⚙ 開啟，分頁為「書卷別名」（`alias_tab.py`，9c）與「講員」（`speaker_tab.py`，編輯 `speaker_words`，單字詞拒絕）。書卷別名分頁：可新增、移除、還原預設；新增時即時檢查，單字別名需確認；儲存後立即生效。
 - 啟動時若 `bible_books.load_warnings()` 不為空，顯示通知。
 - **所有 `messagebox` 呼叫只存在於 `ui/`。**
 

@@ -48,6 +48,18 @@ class Sermon:
     warnings: list[str] = field(default_factory=list)
 
 
+def speaker_word_problem(word: str) -> str | None:
+    """講員字詞會從證道文字中全部刪除，檢查是否安全；沒有問題回傳 None。"""
+    if not word:
+        return "不可為空白"
+    if len(word) < 2:
+        # 單一個字會把標題中所有相同的字刪掉
+        return "至少需要兩個字，單一個字會刪掉標題中所有相同的字"
+    if re.search(r"[\d:：、.)]", word):
+        return "不可包含數字或標題、經文使用的符號"
+    return None
+
+
 def parse_sermon(text: str, speaker_words: list[str]) -> Sermon:
     for word in speaker_words:
         text = text.replace(word, "")
