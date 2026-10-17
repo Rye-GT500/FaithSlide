@@ -7,7 +7,14 @@ import tempfile
 from pathlib import Path
 
 from tests import legacy_runner
-from tests.snapshot_tools import SNAPSHOT_DIR, build_snapshot, dump, sample_reports, snapshot_path
+from tests.slide_extract import extract_slides
+from tests.snapshot_tools import SNAPSHOT_DIR, dump, sample_reports, snapshot_path
+
+
+def build_snapshot(docx_path: Path, out_pptx: Path, cache: legacy_runner.VerseCache) -> dict:
+    messages = legacy_runner.run(docx_path, out_pptx, cache)
+    slides = extract_slides(out_pptx) if out_pptx.exists() else None
+    return {"source": docx_path.name, "messages": messages, "slides": slides}
 
 
 def main():

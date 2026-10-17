@@ -1,6 +1,6 @@
 # FaithSlide SRP 重構企畫書
 
-> 狀態：**已確認，實施中**（第 0～6 階段完成）
+> 狀態：**已確認，實施中**（第 0～7 階段完成）
 > 範圍：`FaithSlide.py`（967 行，單一檔案）→ `faithslide/` 套件
 > 不在範圍內：`BibleDictionary.py`（由作者自行隔離）
 
@@ -255,11 +255,22 @@ class SlideBuilder:
 ### 4.7 `pipeline.py`
 
 ```python
+class GenerationError(Exception): ...        # 訊息可直接顯示給使用者
+
+@dataclass
+class GenerationResult:
+    warnings: list[str]
+
 def generate(word_path: str, ppt_path: str,
-             on_progress: Callable[[float, str], None] = lambda p, m: None) -> None
+             on_progress: Callable[[float, str], None] = ...) -> GenerationResult   # 進度 0～1
 ```
 
-依序執行：讀 Word → 解析讀經/證道 → 查經文 → 建投影片 → 存檔。錯誤以例外向上拋出，由 UI 決定如何顯示。
+依序執行：讀 Word → 解析讀經/證道 → 查經文 → 建投影片 → 存檔。
+
+- 無法讀取 Word、範本，或存檔失敗（例如檔案正在 PowerPoint 中開啟）：拋出 `GenerationError`。
+- 單一引用格式錯誤、查無章節、節數超出本章：記錄於 `GenerationResult.warnings` 並略過，繼續製作。同一範圍的超出節數只警告一次。
+- 已驗證：snapshot 測試改為以 pipeline 產生（離線），4 份與基準完全一致、無警告；另以實際 API 連網執行，結果相同。
+- 第 7 階段結束時，程式介面仍使用舊的 `produce_the_slides`；第 8 階段改接 pipeline，並移除 `FaithSlide.py`、`tests/legacy_runner.py`、`tests/make_baseline.py`（基準已凍結，API 錄製資料保留）。
 
 - 投影片順序：讀經經文 → 主標題（2 張）→ **主標題後的引用經文**（作者決定：偶爾會出現，予以製作）→ 各大標題、其引用 → 各中標題、其引用 → 各小標題、其引用。
 - 證道經文去除空白後再放入投影片（沿用舊版）。

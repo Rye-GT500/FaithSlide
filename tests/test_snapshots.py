@@ -1,23 +1,23 @@
-"""離線重跑範例週報，輸出必須與基準 snapshot 一致。
-
-目前產生器為現行 FaithSlide.py（驗證基準可重現）；第 7 階段改接 pipeline.generate。
-"""
+"""以 pipeline 離線重跑範例週報，投影片必須與重構前的基準 snapshot 一致。"""
 import json
 
 import pytest
 
-from tests import legacy_runner
-from tests.snapshot_tools import build_snapshot, sample_reports, snapshot_path
+from faithslide import bible_api, pipeline
+from tests.fixture_api import FixtureBible
+from tests.slide_extract import extract_slides
+from tests.snapshot_tools import sample_reports, snapshot_path
 
 
 @pytest.mark.parametrize("docx_path", sample_reports(), ids=lambda p: p.stem)
-def test_matches_baseline(docx_path, tmp_path):
-    expected_path = snapshot_path(docx_path)
-    if not expected_path.exists():
-        pytest.fail(f"缺少基準，請先執行 python -m tests.make_baseline：{expected_path.name}")
+def test_matches_baseline(docx_path, tmp_path, monkeypatch):
+    expected = json.loads(snapshot_path(docx_path).read_text(encoding="utf-8"))
+    bible = FixtureBible()
+    monkeypatch.setattr(bible_api, "get_chapter", bible.get_chapter)
 
-    cache = legacy_runner.VerseCache(allow_network=False)
-    actual = build_snapshot(docx_path, tmp_path / "out.pptx", cache)
+    out = tmp_path / "out.pptx"
+    result = pipeline.generate(str(docx_path), str(out))
 
-    assert cache.missing == [], "API 快取缺少章節，請重新錄製基準"
-    assert actual == json.loads(expected_path.read_text(encoding="utf-8"))
+    assert bible.missing == [], "API 測試資料缺少章節"
+    assert result.warnings == []
+    assert extract_slides(out) == expected["slides"]
