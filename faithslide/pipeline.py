@@ -10,7 +10,7 @@ from faithslide import bible_api, paths, settings, word_reader
 from faithslide.bible_api import BibleApiError, Verse
 from faithslide.bible_books import Book
 from faithslide.ppt_builder import SlideBuilder, TemplateError
-from faithslide.reference_parser import ReferenceParseError, format_title, parse
+from faithslide.reference_parser import ReferenceParseError, format_title, has_space_between_digits, parse
 from faithslide.sermon_parser import Section, Sermon, parse_reading, parse_sermon
 
 logger = logging.getLogger(__name__)
@@ -80,33 +80,34 @@ class _VerseSlides:
 
     def add_sermon(self, sermon: Sermon, on_progress: ProgressCallback) -> None:
         self.builder.add_main_title(sermon.title)
-        self.add_references(sermon.references)
+        self.add_references(sermon.references, sermon.title or "主標題")
         for i, major in enumerate(sermon.sections):
             on_progress(0.2 + 0.75 * i / len(sermon.sections), f"{major.number}、{major.text}")
             self.add_major(major)
 
     def add_major(self, major: Section) -> None:
         self.builder.add_major(major)
-        self.add_references(major.references)
+        self.add_references(major.references, f"{major.number}、{major.text}")
         for medium in major.children:
             self.builder.add_medium(major, medium)
-            self.add_references(medium.references)
+            self.add_references(medium.references, f"{medium.number}. {medium.text}")
             for minor in medium.children:
                 self.builder.add_minor(major, medium, minor)
-                self.add_references(minor.references)
+                self.add_references(minor.references, f"{minor.number}) {minor.text}")
 
-    def add_references(self, raws: list[str]) -> None:
+    def add_references(self, raws: list[str], heading: str) -> None:
         for raw in raws:
+            where = f"「{heading}」中的「{raw}」"
             try:
                 refs = parse(raw, self.default_book)
             except ReferenceParseError as e:
-                _warn(self.result, str(e))
+                _warn(self.result, f"{where}：{e}")
                 continue
             for ref in refs:
                 try:
                     chapter = {v.number: v for v in bible_api.get_chapter(ref.book, ref.chapter)}
                 except BibleApiError as e:
-                    _warn(self.result, f"{format_title(ref)}：{e}")
+                    _warn(self.result, f"{where}：{format_title(ref)} {e}")
                     continue
                 for verse_range in ref.ranges or [(min(chapter), max(chapter))]:
                     title = format_title(ref, verse_range if ref.ranges else None)
@@ -119,7 +120,11 @@ class _VerseSlides:
                         # 經文去除空白後放入投影片
                         self.builder.add_verse(title, Verse(number, verse.text.replace(" ", "")))
                     if missing:
-                        _warn(self.result, f"{title}：本章沒有第 {missing[0]} 節，已略過不存在的節數")
+                        message = f"{where}：{format_title(ref)}沒有第 {missing[0]} 節，已略過不存在的節數"
+                        if has_space_between_digits(raw):
+                            # 例如「3:16 4:1」被合併成「3:164」
+                            message += "。數字之間有空白，可能是兩段經文之間少了逗號"
+                        _warn(self.result, message)
 
 
 def _warn(result: GenerationResult, message: str) -> None:

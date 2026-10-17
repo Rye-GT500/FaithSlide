@@ -30,13 +30,13 @@ def test_parse_sermon_full_outline():
     assert sermon.warnings == []
     assert outline(sermon.sections) == [
         (MAJOR, "一", "神翻轉生命：", [], [
-            (MEDIUM, "1", "從死亡到生命：", ["弗2:1-3,5-6"], []),
-            (MEDIUM, "2", "從敗壞到美好：", ["弗1:3", "箴5:3"], [
-                (MINOR, "1", "小標題：", ["1:7-8,10"], []),
+            (MEDIUM, "1", "從死亡到生命：", ["弗 2:1-3,5-6"], []),
+            (MEDIUM, "2", "從敗壞到美好：", ["弗 1:3", "箴 5:3"], [
+                (MINOR, "1", "小標題：", ["1:7-8, 10"], []),
             ]),
         ]),
-        (MAJOR, "二", "活出新生命：", ["弗1:4"], [
-            (MEDIUM, "1", "認識耶穌：", ["弗1:17-19"], []),
+        (MAJOR, "二", "活出新生命：", ["弗 1:4"], [
+            (MEDIUM, "1", "認識耶穌：", ["弗 1:17-19"], []),
         ]),
     ]
 
@@ -59,13 +59,13 @@ def test_two_digit_heading_numbers():
 def test_main_title_references_kept_separately():
     sermon = parse_sermon("主標題 創 1:1-3 一、大標題", [])
     assert sermon.title == "主標題"
-    assert sermon.references == ["創1:1-3"]
+    assert sermon.references == ["創 1:1-3"]
 
 
 def test_sermon_starting_with_heading_has_empty_title():
     sermon = parse_sermon("一、大標題 創 1:1", [])
     assert sermon.title == ""
-    assert sermon.sections[0].references == ["創1:1"]
+    assert sermon.sections[0].references == ["創 1:1"]
 
 
 def test_orphan_headings_are_skipped_with_warning():
@@ -150,3 +150,12 @@ def test_saved_speaker_words_used_by_pipeline_settings():
     settings.save("speaker_words", ["王小明"])
     sermon = parse_sermon("主標題 王小明 一、大標題", settings.get("speaker_words"))
     assert sermon.title == "主標題"
+
+
+def test_unrecognized_fragments_warned_with_heading():
+    sermon = parse_sermon("主標題 一、大標題 約 3:16 4:1 1. 中標題 約 3：16", [])
+    assert sermon.warnings == [
+        "「一、大標題」中的「:1」：無法辨識，可能是兩段經文之間少了逗號",
+        # 全形冒號的經文沒被辨識，會整段留在標題裡，警告中顯示實際的標題
+        "「1.中標題約3：16」中的「3：16」：章節之間請使用半形冒號「:」",
+    ]

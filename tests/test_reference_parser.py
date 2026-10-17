@@ -2,7 +2,8 @@ import pytest
 
 from faithslide import bible_books
 from faithslide.reference_parser import (
-    Reference, ReferenceParseError, chinese_numeral, find_references, format_title, parse, text_before_references,
+    Reference, ReferenceParseError, chinese_numeral, find_references, find_unrecognized, format_title,
+    has_space_between_digits, parse, text_before_references,
 )
 
 
@@ -13,31 +14,59 @@ def book(name):
 # --- find_references ---------------------------------------------------------
 
 @pytest.mark.parametrize("text, expected", [
-    # README 範例格式
-    ("一、這是第一個大標題： 創 1:4", ["創1:4"]),
-    ("1. 這是第一個中標題： 創 1:5-6 箴 5:3", ["創1:5-6", "箴5:3"]),
-    ("1) 這是第一個小標題： 創 1:7-8, 10", ["創1:7-8,10"]),
-    ("2. 這是第二個中標題 創 1:11, 13, 15-17", ["創1:11,13,15-17"]),
+    # README 範例格式；保留原文寫法（連續空白縮成一個）
+    ("一、這是第一個大標題： 創 1:4", ["創 1:4"]),
+    ("1. 這是第一個中標題： 創 1:5-6 箴 5:3", ["創 1:5-6", "箴 5:3"]),
+    ("1) 這是第一個小標題： 創 1:7-8, 10", ["創 1:7-8, 10"]),
+    ("2. 這是第二個中標題 創 1:11, 13, 15-17", ["創 1:11, 13, 15-17"]),
+    # 書卷緊接章節時不加空白
+    ("標題 創1:4", ["創1:4"]),
     # 沒寫書卷
     ("標題 1:3", ["1:3"]),
     # 書卷只套用到後面第一組章節
-    ("標題 約 3:16, 羅 4:1", ["約3:16,", "羅4:1"]),
+    ("標題 約 3:16, 羅 4:1", ["約 3:16,", "羅 4:1"]),
     # Word run 切開的數字
-    ("標題 士 18:3 1, 約 1:14", ["士18:31,", "約1:14"]),
-    ("標題 18:1 , 9- 1 0", ["18:1,9-10"]),
+    ("標題 士 18:3 1, 約 1:14", ["士 18:3 1,", "約 1:14"]),
+    ("標題 18:1 , 9- 1 0", ["18:1 , 9- 1 0"]),
     # 長名稱
-    ("標題 約壹 3:1 林前 13:4", ["約壹3:1", "林前13:4"]),
+    ("標題 約壹 3:1 林前 13:4", ["約壹 3:1", "林前 13:4"]),
     # 跨章節的逗號
-    ("標題 約 3:16,18,4:2", ["約3:16,18,4:2"]),
-    # 範圍符號前後可有空白；尾端多餘的符號不納入
-    ("標題 創 1:5 - 6", ["創1:5-6"]),
-    ("標題 創 1:5-6 ", ["創1:5-6"]),
+    ("標題 約 3:16,18,4:2", ["約 3:16,18,4:2"]),
+    # 範圍符號前後可有空白；尾端多餘的空白不納入
+    ("標題 創 1:5 - 6", ["創 1:5 - 6"]),
+    ("標題 創 1:5-6   ", ["創 1:5-6"]),
     # 標題中緊貼中文字的書卷字不算
-    ("一、約翰的見證 約 1:4", ["約1:4"]),
+    ("一、約翰的見證 約 1:4", ["約 1:4"]),
     ("沒有引用的標題", []),
 ])
 def test_find_references(text, expected):
     assert find_references(text) == expected
+
+
+@pytest.mark.parametrize("text, raw_parsed", [
+    ("標題 士 18:3 1, 約 1:14", [("jdg", 18, ((31, 31),)), ("jhn", 1, ((14, 14),))]),
+    ("標題 18:1 , 9- 1 0", [("jdg", 18, ((1, 1), (9, 10)))]),
+])
+def test_found_references_parse_like_before(text, raw_parsed):
+    # 保留原文空白不影響解析結果
+    refs = [r for raw in find_references(text) for r in parse(raw, book("士"))]
+    assert [(r.book.id, r.chapter, r.ranges) for r in refs] == raw_parsed
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("標題 約 3:16 4:1", [(":1", "無法辨識，可能是兩段經文之間少了逗號")]),
+    ("標題 約 3：16", [("3：16", "章節之間請使用半形冒號「:」")]),
+    ("1. 標題： 弗 2:10", []),
+    ("一、標題：說明 1:5-6, 10", []),
+    ("沒有引用的標題：內容", []),
+])
+def test_find_unrecognized(text, expected):
+    assert find_unrecognized(text) == expected
+
+
+@pytest.mark.parametrize("raw, expected", [("18:3 1", True), ("約 3:16 4", True), ("約 3:16, 4:1", False), ("約3:16", False)])
+def test_has_space_between_digits(raw, expected):
+    assert has_space_between_digits(raw) == expected
 
 
 def test_text_before_references():

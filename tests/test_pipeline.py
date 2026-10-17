@@ -112,3 +112,14 @@ def test_output_locked_by_powerpoint(tmp_path, chapters, monkeypatch):
     monkeypatch.setattr(pipeline.SlideBuilder, "save", locked)
     with pytest.raises(GenerationError, match="PowerPoint 中開啟"):
         pipeline.generate(docx, str(tmp_path / "out.pptx"))
+
+
+def test_warning_names_heading_and_original_text(tmp_path, chapters):
+    result, _, _ = run(tmp_path, "主標題 一、大標題 1. 中標題 羅 1:9")
+    assert result.warnings == ["「1. 中標題」中的「羅 1:9」：羅馬書一章沒有第 9 節，已略過不存在的節數"]
+
+
+def test_merged_references_get_missing_comma_hint(tmp_path, chapters):
+    # 「3:1 4:1」被合併成「3:14」，超出本章範圍
+    result, _, _ = run(tmp_path, "主標題 一、大標題 羅 3:1 4:1")
+    assert any("少了逗號" in w and "羅 3:1 4" in w for w in result.warnings)

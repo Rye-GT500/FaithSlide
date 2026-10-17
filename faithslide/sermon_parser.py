@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from faithslide import bible_books
 from faithslide.bible_api import Verse
 from faithslide.bible_books import Book
-from faithslide.reference_parser import find_references, text_before_references
+from faithslide.reference_parser import find_references, find_unrecognized, text_before_references
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +66,10 @@ def parse_sermon(text: str, speaker_words: list[str]) -> Sermon:
     parts = _HEADING_SPLIT.split(text)
 
     sermon = Sermon(title=_heading_text(parts[0]), references=find_references(parts[0]))
+    _check_unrecognized(sermon, sermon.title or "主標題", parts[0])
     for part in parts[1:]:
         heading = _heading_text(part)
+        _check_unrecognized(sermon, heading, part)
         match = _HEADING_MARKER.match(heading)
         if not match:
             _warn(sermon, f"無法辨識的標題「{heading}」，已略過")
@@ -88,6 +90,11 @@ def parse_sermon(text: str, speaker_words: list[str]) -> Sermon:
                 continue
             sermon.sections[-1].children[-1].children.append(section)
     return sermon
+
+
+def _check_unrecognized(sermon: Sermon, heading: str, part: str) -> None:
+    for fragment, reason in find_unrecognized(part):
+        _warn(sermon, f"「{heading}」中的「{fragment}」：{reason}")
 
 
 def _heading_text(part: str) -> str:

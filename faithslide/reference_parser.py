@@ -51,22 +51,47 @@ def _first_reference_regex(books: str) -> re.Pattern:
     return re.compile(rf"(?<![{_CJK}])(?:{books})+\s*{_CHAPTER_VERSES}|{_CHAPTER_VERSES}")
 
 
+def _collapse_spaces(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def find_references(text: str) -> list[str]:
-    """從一段文字找出所有引用字串（已去除空白）。
+    """從一段文字找出所有引用字串，保留週報原文的寫法（連續空白縮成一個），供錯誤訊息引用。
 
     書卷與章節之間可以隔著其他文字；章節前沒有書卷時，回傳的字串不含書卷。
-    書卷只套用到它後面的第一組章節。
+    書卷只套用到它後面的第一組章節。parse 會去除空白，所以保留空白不影響解析。
     """
     refs = []
-    book = ""
-    for token in _token_regex(bible_books.name_pattern()).findall(text):
-        token = token.replace(" ", "")
+    book = None
+    for match in _token_regex(bible_books.name_pattern()).finditer(text):
+        token = _collapse_spaces(match.group())
         if token[0].isdigit():
-            refs.append(book + token)
-            book = ""
+            if book:
+                gap = "" if book.end() == match.start() else " "
+                refs.append(_collapse_spaces(book.group()) + gap + token)
+            else:
+                refs.append(token)
+            book = None
         else:
-            book = token
+            book = match
     return refs
+
+
+def find_unrecognized(text: str) -> list[tuple[str, str]]:
+    """找出看起來像經文、卻沒有被辨識的片段，回傳 [(片段, 原因)]。"""
+    # 把已辨識的部分換成分隔符號，避免前後文字接在一起
+    leftover = _token_regex(bible_books.name_pattern()).sub(" | ", text)
+    problems = []
+    for match in re.finditer(r"\d+\s*：\s*\d+", leftover):
+        problems.append((_collapse_spaces(match.group()), "章節之間請使用半形冒號「:」"))
+    for match in re.finditer(r"(?<![\d：])\s*:\s*\d+", leftover):
+        problems.append((_collapse_spaces(match.group()), "無法辨識，可能是兩段經文之間少了逗號"))
+    return problems
+
+
+def has_space_between_digits(raw: str) -> bool:
+    """原文的數字之間是否夾著空白（可能是 Word 切開的數字，也可能是兩段經文少了逗號）。"""
+    return re.search(r"\d\s+\d", raw) is not None
 
 
 def text_before_references(text: str) -> str | None:
