@@ -6,7 +6,9 @@ import copy
 import re
 
 from pptx import Presentation
-from pptx.util import Pt
+from pptx.oxml.ns import qn
+from pptx.oxml.xmlchemy import OxmlElement
+from pptx.util import Length, Pt
 
 from faithslide.bible_api import Verse
 from faithslide.sermon_parser import Section
@@ -19,6 +21,10 @@ MAJOR = 3                 # 大標題
 OUTLINE = 4               # 中標題 / 小標題（大綱列表）
 VERSE_SHORT_NUMBER = 5    # 經文（節數一位數）
 TEMPLATE_SLIDE_COUNT = 6
+
+# 範本經文字型（微軟正黑體粗體）的字寬，以字體大小為 1；數字等寬
+_GLYPH_WIDTH_EM = {**{digit: 0.596 for digit in "0123456789"}, ".": 0.254}
+_NUMBER_GAP_EM = 0.25     # 節數與經文之間的間隔
 
 # 字體大小計算參數（依範本文字框大小實驗調整）
 _MAX_WIDTH_UNITS = 854
@@ -87,11 +93,12 @@ class SlideBuilder:
 
         p = _first_paragraph(slide.shapes[1])
         text = verse.text.replace("　", " ")
-        p.runs[0].text = number
+        p.runs[0].text = number + "\t"
         p.runs[1].text = text
         size = calculate_font_size(text)
         p.runs[0].font.size = size
         p.runs[1].font.size = size
+        _set_hanging_indent(p, _number_column_width(number, size))
 
     def save(self, path: str) -> None:
         """刪除樣板投影片後存檔。"""
@@ -123,6 +130,30 @@ def _first_paragraph(shape):
     if not p.runs:
         p.add_run()
     return p
+
+
+def _number_column_width(number: str, size: Length) -> int:
+    """節數欄寬（EMU）：節數在此字體大小下的寬度，再加一點間隔。"""
+    em = sum(_GLYPH_WIDTH_EM.get(char, _GLYPH_WIDTH_EM["0"]) for char in number) + _NUMBER_GAP_EM
+    return round(size * em)
+
+
+def _set_hanging_indent(paragraph, width: int) -> None:
+    """凸排：第一行從最左邊開始放節數，Tab 跳到 width，換行後的文字也從 width 開始，與第一行經文對齊。
+
+    範本內建的凸排是固定長度，只在原本的字體大小下對齊；字體會依經文長度調整，所以每張重新計算。
+    """
+    pPr = paragraph._p.get_or_add_pPr()
+    pPr.set("marL", str(width))
+    pPr.set("indent", str(-width))
+    for old in pPr.findall(qn("a:tabLst")):
+        pPr.remove(old)
+    tab_list = OxmlElement("a:tabLst")
+    tab = OxmlElement("a:tab")
+    tab.set("pos", str(width))
+    tab.set("algn", "l")
+    tab_list.append(tab)
+    pPr.insert_element_before(tab_list, "a:defRPr", "a:extLst")
 
 
 def _outline_text(section: Section) -> str:
