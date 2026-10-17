@@ -4,7 +4,8 @@ import tkinter as tk
 import webbrowser
 from tkinter import messagebox, ttk
 
-from faithslide import updater
+from faithslide import bible_books, updater
+from faithslide.ui.alias_dialog import AliasDialog
 from faithslide.ui.background import run_in_background
 from faithslide.ui.search_page import SearchPage
 from faithslide.ui.slide_page import SlidePage
@@ -29,8 +30,11 @@ class MainWindow:
             page.grid(row=0, column=0, sticky="nsew")
         self.current = 0
 
-        ttk.Button(self.root, text="切換", command=self.change_page).grid(row=1, column=0, pady=(15, 0), sticky="e")
-        ttk.Button(self.root, text="退出", command=self.close).grid(row=1, column=1, pady=(15, 0), sticky="w")
+        buttons = ttk.Frame(self.root)
+        buttons.grid(row=1, column=0, columnspan=2, pady=(15, 0))
+        ttk.Button(buttons, text="切換", command=self.change_page).pack(side="left", padx=5)
+        ttk.Button(buttons, text="書卷別名", command=self.open_alias_settings).pack(side="left", padx=5)
+        ttk.Button(buttons, text="退出", command=self.close).pack(side="left", padx=5)
 
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_rowconfigure(1, weight=0)
@@ -43,11 +47,21 @@ class MainWindow:
         self._show_page(0)
 
     def run(self):
+        self.root.after(0, self._notify_load_warnings)
         self._check_update()
         self.root.mainloop()
 
     def change_page(self, event=None):
         self._show_page(1 - self.current)
+
+    def open_alias_settings(self):
+        AliasDialog(self.root)
+
+    def _notify_load_warnings(self):
+        warnings = bible_books.load_warnings()
+        if warnings:
+            details = "\n".join(f"・{w}" for w in warnings)
+            messagebox.showwarning("書卷別名設定", f"部分自訂書卷別名未套用：\n{details}\n\n可在「書卷別名」中修正。")
 
     def close(self, event=None):
         self.root.destroy()

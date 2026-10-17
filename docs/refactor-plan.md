@@ -41,6 +41,7 @@ FaitSlide/
 │  ├─ updater.py               檢查 GitHub 最新版本（不碰 UI）
 │  └─ ui/
 │     ├─ __init__.py
+│     ├─ alias_dialog.py       書卷別名設定視窗
 │     ├─ background.py         背景執行緒工作（queue 交回主執行緒）
 │     ├─ main_window.py        主視窗、頁面切換、快捷鍵、啟動更新檢查
 │     ├─ slide_page.py         PPT 製作頁
@@ -120,15 +121,20 @@ def reload() -> None                     # 設定變更後呼叫
 def all_books() -> list[Book]
 def resolve(name: str) -> Book | None    # 接受 full / abbr / alias
 def name_pattern() -> str                # 依長度遞減排序、re.escape 後以 | 串接
-def save_user_aliases(changes) -> None   # 有衝突時拋出 AliasConflictError，不寫入
-def rejected_aliases() -> list[AliasConflict]   # load 時被拒絕的使用者別名，供 UI 通知
+def default_books() -> list[Book]                          # 未套用使用者別名
+def alias_problem(name: str) -> str | None                 # 別名本身的格式問題
+def check_aliases(aliases_by_book) -> list[RejectedAlias]  # 書卷 id → 完整別名清單
+def save_user_aliases(aliases_by_book) -> None             # 有被拒絕的別名時拋出 AliasConflictError，不寫入
+def load_warnings() -> list[str]                           # 載入時被忽略的別名或檔案問題，供 UI 通知
 ```
 
 **驗證規則**
 
 - 同一名稱對應到多卷書：**直接拒絕並通知**。
   - 儲存時：拋出 `AliasConflictError`（列出衝突的別名與書卷），不寫入檔案，由設定 UI 顯示。
-  - 載入時（例如使用者手動編輯了 JSON）：略過衝突的別名，其餘照常載入；UI 啟動後讀取 `rejected_aliases()` 顯示通知。
+  - 載入時（例如使用者手動編輯了 JSON）：略過衝突的別名，其餘照常載入；UI 啟動後讀取 `load_warnings()` 顯示通知。
+- 別名不可包含數字、空白或引用格式用到的標點（會破壞引用解析），長度上限 10 字。
+- 套用時先處理所有移除再處理新增，所以可以一次把別名從 A 書移到 B 書。
 - 使用者檔損毀：記錄 log，只使用預設表，程式照常啟動。
 - 常用字別名（如「主」、「神」）：由設定 UI 顯示警告，不在此層阻擋。
 
@@ -295,7 +301,8 @@ def check() -> UpdateInfo | None    # 失敗或無新版都回傳 None，並記�
 - `main_window.py`：建立 `Tk`、頁面切換（F5）、退出（Esc）、Enter 交給目前頁面。兩頁同時建立、切換時只顯示其中一頁，輸入內容不會因切換而消失。啟動時以 `run_in_background` 呼叫 `updater.check()`。
 - `slide_page.py`：檔案選擇、進度條。製作前檢查是否已選擇檔案；製作中停用「製作」按鈕，避免重複執行。完成時若有警告，列出前 10 則。
 - `search_page.py`：單一輸入框（9d），接受全名、簡寫或別名，多段以「；」分隔，整章可省略節數。每個範圍顯示一個標題；不存在的節數以對話框提示。查詢邏輯 `lookup()` 不依賴 Tk，可單獨測試。
-- 啟動時若 `bible_books.rejected_aliases()` 不為空，顯示通知（第 9c 階段）。
+- `alias_dialog.py`（9c）：主視窗「書卷別名」按鈕開啟。可新增、移除、還原預設；新增時即時檢查，單字別名需確認；儲存後立即生效。
+- 啟動時若 `bible_books.load_warnings()` 不為空，顯示通知。
 - **所有 `messagebox` 呼叫只存在於 `ui/`。**
 
 ---
@@ -335,9 +342,9 @@ log 設定在 `main.py` 統一初始化一次，各模組使用 `logging.getLogg
 |---|---|
 | 9a. 版本比較修正 ✅ | 字串比較 → 數字逐段比較；數字相同時正式版大於預覽版（從 1.2.2-beta 會提示更新到 1.2.2，舊版不會） |
 | 9b. log 位置 ✅ | exe 旁 → `%APPDATA%\FaithSlide\FaithSlide.log`（安裝在 Program Files 時無寫入權限）；README 的回報說明需同步更新 |
-| 9c. 使用者自訂別名 | `books.user.json` 讀寫 + 設定 UI |
+| 9c. 使用者自訂別名 ✅ | `books.user.json` 讀寫 + 設定 UI |
 | 9d. 查詢頁單一輸入框 ✅ | 移除書卷下拉選單與章、節欄位。輸入框接受全名、簡寫或別名（如 `約3:16-18`、`約翰福音3:16`）→ `parse` → 依（書卷, 章）分組查詢 → 依 ranges 篩選顯示 |
-| 9e. 舊版 bug（第 7 階段接上新模組後自動修正，snapshot 不受影響） | 「各」作為縮寫時標題組不出來；章數為整十的三位數（如詩篇 100、110、150）中文數字錯誤（「一百零零」、「一百一十零」）；二位數標題編號（`10.`、`十一、`）被從中間切開；主標題後接引用、中標題沒有引用、小標題出現在中標題前時，整份證道或整個段落製作失敗；讀經缺少時整份製作失敗；讀經格式 B 的書名含中文數字（如約翰一書）時被切成「約翰」；無引用的標題保留了 Word run 產生的空白；標題文字或讀經經文含第二個分隔符號（如 `1.a.b`）時被截斷 |
+| 9e. 舊版 bug ✅（第 7 階段接上新模組後自動修正，snapshot 不受影響） | 「各」作為縮寫時標題組不出來；章數為整十的三位數（如詩篇 100、110、150）中文數字錯誤（「一百零零」、「一百一十零」）；二位數標題編號（`10.`、`十一、`）被從中間切開；主標題後接引用、中標題沒有引用、小標題出現在中標題前時，整份證道或整個段落製作失敗；讀經缺少時整份製作失敗；讀經格式 B 的書名含中文數字（如約翰一書）時被切成「約翰」；無引用的標題保留了 Word run 產生的空白；標題文字或讀經經文含第二個分隔符號（如 `1.a.b`）時被截斷 |
 | 9f. 可疑引用提示（非首要） | 偵測使用者輸入失誤（如「3:16 4:1」被合併成「3:164」導致節數超出該章），提示使用者而非默默略過 |
 
 ### 打包同步（第 8 階段完成後）
