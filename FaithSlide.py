@@ -913,7 +913,7 @@ def check_update():
             latest_data = response.json()
             latest_version = latest_data['tag_name'].replace('v', '').replace('-beta', '') # 假設 tag 是 v1.2.2
             
-            if latest_version > CURRENT_VERSION:
+            if latest_version > CURRENT_VERSION.replace('-beta', ''):
                 if messagebox.askyesno("更新通知", f"發現新版本 v{latest_version}！\n是否前往下載？"):
                     webbrowser.open(latest_data['html_url']) # 開啟瀏覽器跳轉到 Release 頁面
     except Exception as e:
