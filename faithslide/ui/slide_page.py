@@ -3,7 +3,7 @@ import logging
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from faithslide import pipeline
+from faithslide import paths, pipeline
 from faithslide.pipeline import GenerationError
 from faithslide.ui.background import run_in_background
 
@@ -94,7 +94,8 @@ class SlidePage(ttk.Frame):
         self.produce_btn.state(["!disabled"])
         if warnings:
             shown = "\n".join(f"・{w}" for w in warnings[:MAX_WARNINGS_SHOWN])
-            more = f"\n…另有 {len(warnings) - MAX_WARNINGS_SHOWN} 則，詳見記錄檔" if len(warnings) > MAX_WARNINGS_SHOWN else ""
+            more = (f"\n…另有 {len(warnings) - MAX_WARNINGS_SHOWN} 則，詳見記錄檔：\n{paths.log_path()}"
+                    if len(warnings) > MAX_WARNINGS_SHOWN else "")
             messagebox.showwarning("製作完成", f"製作完成，但有以下問題：\n{shown}{more}")
         else:
             messagebox.showinfo("", "製作完成")

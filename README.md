@@ -67,5 +67,5 @@ FaithSlide 是一款桌面應用程式，旨在幫助教會媒體同工**一鍵�
 
 本專案由 **[郭承叡]** (@Rye-GT500) 獨立開發。
 
-  * **問題回報：** 請在 GitHub 開立一個 Issue 說明問題，並**附上日誌檔案 (`FaithSlide.log`)**。
+  * **問題回報：** 請在 GitHub 開立一個 Issue 說明問題，並**附上日誌檔案 (`FaithSlide.log`)**。日誌檔位於 `%APPDATA%\FaithSlide\FaithSlide.log`（可在檔案總管網址列輸入 `%APPDATA%\FaithSlide` 開啟）。
   * **聯絡開發者：** `raykou960810@gmail.com`

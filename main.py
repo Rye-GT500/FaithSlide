@@ -5,7 +5,7 @@ from faithslide import paths
 
 def setup_logging():
     logging.basicConfig(
-        filename=paths.LOG_PATH,
+        filename=paths.log_path(),
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         encoding="utf-8"
