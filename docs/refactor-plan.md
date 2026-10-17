@@ -1,6 +1,6 @@
 # FaithSlide SRP 重構企畫書
 
-> 狀態：**已確認，實施中**（第 0～5 階段完成）
+> 狀態：**已確認，實施中**（第 0～6 階段完成）
 > 範圍：`FaithSlide.py`（967 行，單一檔案）→ `faithslide/` 套件
 > 不在範圍內：`BibleDictionary.py`（由作者自行隔離）
 
@@ -64,7 +64,7 @@ ui ──► pipeline ──► word_reader
  │         │──────► sermon_parser ──► reference_parser ──► bible_books
  │         │              └─────────► bible_api（只用 Verse 型別）
  │         │──────► bible_api ─────────────────────────────► bible_books
- │         └──────► ppt_builder
+ │         └──────► ppt_builder ──► sermon_parser、bible_api（只用 Section、Verse 型別）
  ├──► reference_parser / bible_api      （查詢頁）
  ├──► bible_books                       （設定、下拉選單）
  └──► updater ──► version
@@ -245,7 +245,10 @@ class SlideBuilder:
 ```
 
 - 模板投影片索引（0～5）改成具名常數。
-- `calculate_font_size`、`get_weighted_length` 為模組內私有函式。
+- `calculate_font_size` 公開（供測試），`_weighted_length` 為私有。
+- 中、小標題以物件識別（`is`）判斷目前項目，不再以字串比對（舊版遇到同名標題會停在第一個）。
+- 存檔時連同關聯移除樣板投影片；舊版只從清單移除，6 張樣板仍留在檔案中。
+- 已用 4 份範例週報比對：新模組 + `SlideBuilder` 產生的 PPT 與第 0 階段 snapshot 完全一致（版面、文字、字體大小）。
 
 **取代的現有程式碼**：`duplicate_slide`、`remove_slide`、所有 `*_PPT` 函式、字體計算。
 
@@ -257,6 +260,9 @@ def generate(word_path: str, ppt_path: str,
 ```
 
 依序執行：讀 Word → 解析讀經/證道 → 查經文 → 建投影片 → 存檔。錯誤以例外向上拋出，由 UI 決定如何顯示。
+
+- 投影片順序：讀經經文 → 主標題（2 張）→ **主標題後的引用經文**（作者決定：偶爾會出現，予以製作）→ 各大標題、其引用 → 各中標題、其引用 → 各小標題、其引用。
+- 證道經文去除空白後再放入投影片（沿用舊版）。
 
 **取代的現有程式碼**：`produce_the_slides`、`paragraph_PPT`。
 
