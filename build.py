@@ -11,7 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 VERSION_FILE = ROOT / "faithslide" / "version.py"
-INSTALLER_SCRIPT = ROOT / "FaithSlide_Installer.iss"
+INSTALLER_DIR = ROOT / "installer"
+INSTALLER_SCRIPT = INSTALLER_DIR / "FaithSlide_Installer.iss"
 ISCC_CANDIDATES = [
     Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"),
     Path(r"C:\Program Files\Inno Setup 6\ISCC.exe"),
@@ -184,8 +185,7 @@ def build_executable(runner):
     runner.run(
         sys.executable, "-m", "PyInstaller", "--noconfirm", "--onefile", "--noconsole",
         "--name", APP_NAME,
-        "--icon", ROOT / "icon.ico",
-        "--add-data", f"{ROOT / 'template.pptx'}{sep}.",
+        "--icon", INSTALLER_DIR / "icon.ico",
         "--add-data", f"{ROOT / 'faithslide' / 'data'}{sep}faithslide/data",
         "--specpath", ROOT / "build",
         "--distpath", ROOT / "dist",

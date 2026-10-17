@@ -15,6 +15,7 @@ venv/
 # 打包輸出
 dist/
 build/
+Output/
 *.spec
 
 # 暫存資料
@@ -29,7 +30,5 @@ temp/
 *.pptx
 !template.pptx
 *.exe
-sermon_analysis_test.ipynb
-sermon_analysis_test.py
 # pytest
 .pytest_cache/

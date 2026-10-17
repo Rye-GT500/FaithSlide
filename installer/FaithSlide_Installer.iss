@@ -1,6 +1,6 @@
 ﻿; FaithSlide 安裝程式
 ; 由 build.py 呼叫：ISCC /DAppVersion=1.3.0 FaithSlide_Installer.iss
-; 路徑皆相對於本檔所在資料夾
+; 路徑皆相對於本檔所在資料夾（installer/）
 
 #ifndef AppVersion
   #define AppVersion "0.0.0-dev"
@@ -14,7 +14,7 @@ AppVersion={#AppVersion}
 AppVerName=FaithSlide {#AppVersion}
 DefaultDirName={autopf}\FaithSlide
 DefaultGroupName=FaithSlide
-OutputDir=Output
+OutputDir=..\Output
 OutputBaseFilename=FaithSlide-Setup-{#AppVersion}
 SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\FaithSlide.exe
@@ -35,7 +35,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Type: files; Name: "{app}\FaithSlide *.exe"
 
 [Files]
-Source: "dist\FaithSlide.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\FaithSlide.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\FaithSlide"; Filename: "{app}\FaithSlide.exe"

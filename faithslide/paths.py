@@ -6,8 +6,8 @@ FROZEN = getattr(sys, 'frozen', False)
 # PyInstaller 打包時資源解壓在 _MEIPASS
 BUNDLE_DIR = sys._MEIPASS if FROZEN else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-TEMPLATE_PPTX = os.path.join(BUNDLE_DIR, "template.pptx")
 DATA_DIR = os.path.join(BUNDLE_DIR, "faithslide", "data")
+TEMPLATE_PPTX = os.path.join(DATA_DIR, "template.pptx")
 LOG_FILENAME = "FaithSlide.log"
 
 
