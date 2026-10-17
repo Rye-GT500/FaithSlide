@@ -43,6 +43,13 @@ def test_missing_verses_reported():
     assert problems == ["約翰福音三章2-5節：本章沒有第 4 節"]
 
 
+def test_fullwidth_spaces_become_halfwidth(monkeypatch):
+    monkeypatch.setattr(bible_api, "get_chapter", lambda book, chapter: [Verse(16, "「　神愛世人，　甚至")])
+    lines, _ = lookup("約3:16")
+    assert lines[1] == "16. 「 神愛世人， 甚至"
+    assert "　" not in "".join(lines)
+
+
 def test_range_entirely_missing_shows_no_heading():
     lines, problems = lookup("約3:1,99")
     assert lines == ["【約翰福音三章1節】", "1. 約3:1", ""]

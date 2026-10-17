@@ -35,7 +35,8 @@ def lookup(query: str) -> tuple[list[str], list[str]]:
                 first_missing = next(n for n in range(start, end + 1) if n not in chapter)
                 problems.append(f"{title}：本章沒有第 {first_missing} 節")
             if found:
-                lines += [f"【{title}】", *(f"{v.number}. {v.text}" for v in found), ""]
+                # 和合本以全形空白表示敬稱前的空格（如「　神」），顯示時一律改為半形
+                lines += [f"【{title}】", *(f"{v.number}. {v.text.replace(chr(0x3000), ' ')}" for v in found), ""]
     return lines, problems
 
 
