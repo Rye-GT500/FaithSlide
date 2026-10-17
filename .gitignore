@@ -25,8 +25,9 @@ temp/
 # macOS 系統自動產生的資源分叉檔
 ._*
 
-# 忽略特定檔案
+# 忽略特定檔案（投影片只追蹤範本）
 *.pptx
+!template.pptx
 *.exe
 sermon_analysis_test.ipynb
 sermon_analysis_test.py
