@@ -105,18 +105,47 @@ def test_calculate_font_size_shrinks_with_length():
     assert sizes[0] > sizes[-1]
 
 
-@pytest.mark.parametrize("number, text", [(1, "短"), (16, "字" * 40), (176, "字" * 120)])
-def test_verse_hanging_indent_matches_number_width(tmp_path, number, text):
-    """換行後的文字要和第一行經文對齊：凸排距離與 Tab 定位點都等於節數欄寬，且隨字體大小縮放。"""
+def _verse_paragraph_props(tmp_path, number, text):
     from pptx import Presentation
     from pptx.oxml.ns import qn
-    from faithslide.ppt_builder import _GLYPH_WIDTH_EM, _NUMBER_GAP_EM
     out, _ = build(tmp_path, lambda b: b.add_verse("標題", Verse(number, text)))
     p = Presentation(str(out)).slides[0].shapes[1].text_frame.paragraphs[0]
     pPr = p._p.find(qn("a:pPr"))
+    tabs = [(int(t.get("pos")), t.get("algn")) for t in pPr.findall(qn("a:tabLst") + "/" + qn("a:tab"))]
+    return int(pPr.get("marL")), int(pPr.get("indent")), tabs
+
+
+def _number_em(number):
+    from faithslide.ppt_builder import _GLYPH_WIDTH_EM
+    return sum(_GLYPH_WIDTH_EM[c] for c in f"{number}.")
+
+
+@pytest.mark.parametrize("number, text", [(1, "短"), (16, "字" * 40), (176, "字" * 120)])
+def test_verse_hanging_indent_matches_number_width(tmp_path, number, text):
+    """換行後的文字要和第一行經文對齊：凸排距離與 Tab 定位點都等於節數欄寬，且隨字體大小縮放。"""
+    from faithslide.ppt_builder import _NUMBER_GAP_EM
+    expected = round(calculate_font_size(text) * (_number_em(number) + _NUMBER_GAP_EM))
+    assert _verse_paragraph_props(tmp_path, number, text) == (expected, -expected, [(expected, "l")])
+
+
+@pytest.mark.parametrize("mark", ["「", "『", "（", "《", "〈", "【", "〔", "“", "‘"])
+def test_opening_punctuation_hangs_left(tmp_path, mark):
+    """標點懸掛：Tab 停在節數後，標點字格在經文欄左側，後面的字與換行後的文字同在經文欄。"""
+    from faithslide.ppt_builder import _HANGING_GAP_EM
+    text = mark + "神愛世人" * 10
     size = calculate_font_size(text)
-    expected = round(size * (sum(_GLYPH_WIDTH_EM[c] for c in f"{number}.") + _NUMBER_GAP_EM))
-    assert int(pPr.get("marL")) == expected
-    assert int(pPr.get("indent")) == -expected
-    tabs = pPr.findall(qn("a:tabLst") + "/" + qn("a:tab"))
-    assert [(int(t.get("pos")), t.get("algn")) for t in tabs] == [(expected, "l")]
+    tab = round(size * (_number_em(16) + _HANGING_GAP_EM))
+    column = round(size * (_number_em(16) + _HANGING_GAP_EM + 1))
+    assert _verse_paragraph_props(tmp_path, 16, text) == (column, -column, [(tab, "l")])
+
+
+def test_verse_text_is_trimmed(tmp_path):
+    # 讀經「[1]」後常有 Tab，第二個 Tab 會讓第一行跳到其他定位點
+    _, slides = build(tmp_path, lambda b: b.add_verse("標題", Verse(1, "	 　以法蓮山地 ")))
+    assert texts(slides[0])[1][:2] == ["1.	", "以法蓮山地"]
+
+
+def test_one_and_two_digit_verses_use_same_template(tmp_path):
+    _, slides = build(tmp_path, lambda b: [b.add_verse("標題", Verse(n, "經文")) for n in (1, 10)])
+    assert slides[0]["layout"] == slides[1]["layout"]
+    assert len(slides[0]["shapes"]) == len(slides[1]["shapes"])
