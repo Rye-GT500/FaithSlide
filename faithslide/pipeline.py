@@ -49,7 +49,8 @@ def generate(word_path: str, ppt_path: str,
 
     for passage in reading.passages:
         for verse in passage.verses:
-            builder.add_verse(passage.title, verse)
+            if not builder.add_verse(passage.title, verse):
+                _warn_too_long(result, f"讀經「{passage.title}」", verse.number)
     on_progress(0.2, "讀經製作完畢")
 
     if not report.sermon_text:
@@ -118,13 +119,18 @@ class _VerseSlides:
                             missing.append(number)
                             continue
                         # 經文去除空白後放入投影片
-                        self.builder.add_verse(title, Verse(number, verse.text.replace(" ", "")))
+                        if not self.builder.add_verse(title, Verse(number, verse.text.replace(" ", ""))):
+                            _warn_too_long(self.result, where, number)
                     if missing:
                         message = f"{where}：{format_title(ref)}沒有第 {missing[0]} 節，已略過不存在的節數"
                         if has_space_between_digits(raw):
                             # 例如「3:16 4:1」被合併成「3:164」
                             message += "。數字之間有空白，可能是兩段經文之間少了逗號"
                         _warn(self.result, message)
+
+
+def _warn_too_long(result: GenerationResult, where: str, number: int) -> None:
+    _warn(result, f"{where}：第 {number} 節經文太長，最小字體仍放不下一張投影片，請手動分成兩張")
 
 
 def _warn(result: GenerationResult, message: str) -> None:

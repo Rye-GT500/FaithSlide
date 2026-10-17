@@ -3,7 +3,7 @@
 範本前 5 張投影片是各類投影片的樣板，新投影片以複製樣板的方式加在後面，存檔前刪除樣板。
 """
 import copy
-import re
+from dataclasses import dataclass
 
 from pptx import Presentation
 from pptx.oxml.ns import qn
@@ -22,17 +22,37 @@ OUTLINE = 4               # 中標題 / 小標題（大綱列表）
 TEMPLATE_SLIDE_COUNT = 5
 
 # 範本經文字型（微軟正黑體粗體）的字寬，以字體大小為 1；數字等寬
-_GLYPH_WIDTH_EM = {**{digit: 0.596 for digit in "0123456789"}, ".": 0.254}
+_GLYPH_WIDTH_EM = {
+    **{digit: 0.596 for digit in "0123456789"},
+    ".": 0.254, " ": 0.25, "‧": 0.254, "·": 0.255, "•": 0.439, "—": 1.08, "…": 0.859,
+}
 _NUMBER_GAP_EM = 0.25     # 節數與經文之間的間隔
 # 開頭標點的字寬是 1 個字，但筆畫都在右半邊；懸掛到經文欄左側，讓後面的字與換行後的文字對齊
 _OPENING_PUNCTUATION = "「『（《〈【〔“‘"
 _HANGING_GAP_EM = 0.15    # 懸掛時節數與標點字格之間的間隔（標點字格左半邊本身是空白）
 
-# 字體大小計算參數（依範本文字框大小實驗調整）
-_MAX_WIDTH_UNITS = 854
-_MAX_HEIGHT_UNITS = 372
+# 字體大小計算：模擬 PowerPoint 的換行，找出放得下的最大字體（以 PowerPoint 實際排版校準）
 _MIN_FONT_SIZE = 20
 _BASE_FONT_SIZE = 72
+_FONT_SIZE_STEP = 0.5
+_LINE_HEIGHT_EM = 1.2                  # 行高 = 字體大小 × 1.2
+_FIT_MARGIN_EM = 0.01                  # 剛好放滿時 PowerPoint 可能因捨入而換行，保守預留
+_INSET_X, _INSET_Y = Pt(7.2), Pt(3.6)  # PowerPoint 預設的文字框內距（範本未另外設定）
+# 可以懸掛在行尾右邊界外、不會被移到下一行開頭的標點（範本開啟了標點懸掛）
+_CLOSING_PUNCTUATION = set("，。、；：？！」』）》〉】〕”’…,.;:?!)")
+# 不可留在行尾、會跟著下一個字換行的標點
+_NO_LINE_END = set(_OPENING_PUNCTUATION)
+
+
+@dataclass(frozen=True)
+class TextArea:
+    """經文文字框扣掉內距後的可用範圍（EMU）。"""
+    width: int
+    height: int
+
+
+# 範本經文頁的文字框：960 × 445.75 點
+DEFAULT_TEXT_AREA = TextArea(Pt(960) - 2 * _INSET_X, Pt(445.75) - 2 * _INSET_Y)
 
 
 class TemplateError(Exception):
@@ -44,6 +64,8 @@ class SlideBuilder:
         self.prs = Presentation(template_path)
         if len(self.prs.slides) < TEMPLATE_SLIDE_COUNT:
             raise TemplateError(f"範本投影片不足 {TEMPLATE_SLIDE_COUNT} 張：{template_path}")
+        box = self.prs.slides[VERSE].shapes[1]
+        self.verse_area = TextArea(box.width - 2 * _INSET_X, box.height - 2 * _INSET_Y)
 
     def add_main_title(self, title: str) -> None:
         slide = self._duplicate(MAIN_TITLE)
@@ -82,7 +104,8 @@ class SlideBuilder:
             if minor is current:
                 break
 
-    def add_verse(self, title: str, verse: Verse) -> None:
+    def add_verse(self, title: str, verse: Verse) -> bool:
+        """加入經文投影片；經文太長、最小字體也放不下時回傳 False（仍會加入）。"""
         number = f"{verse.number}."
         slide = self._duplicate(VERSE)
 
@@ -98,10 +121,11 @@ class SlideBuilder:
         text = verse.text.replace("　", " ").strip()
         p.runs[0].text = number + "\t"
         p.runs[1].text = text
-        size = calculate_font_size(text)
+        size = calculate_font_size(number, text, self.verse_area)
         p.runs[0].font.size = size
         p.runs[1].font.size = size
         _set_hanging_indent(p, *_verse_indent(number, text, size))
+        return fits(number, text, size, self.verse_area)
 
     def save(self, path: str) -> None:
         """刪除樣板投影片後存檔。"""
@@ -172,20 +196,63 @@ def _outline_text(section: Section) -> str:
     return section.text.replace("：", "") + "\n"
 
 
-def _weighted_length(text: str) -> float:
-    """中文字與全形標點算 1，其他算 0.5。"""
-    return sum(1.0 if re.match(r'[一-鿿]|["，。？！：「」；]', char) else 0.5 for char in text)
+def _char_width_em(char: str) -> float:
+    if char in _GLYPH_WIDTH_EM:
+        return _GLYPH_WIDTH_EM[char]
+    if ord(char) < 0x2000:      # 英文字母等半形字元（寬度不一，取偏寬的值）
+        return 0.6
+    return 1.0                  # 中文字與全形標點
 
 
-def calculate_font_size(text: str, base_size: float = _BASE_FONT_SIZE) -> Pt:
-    """以二分法找出能放進文字框的最大字體。"""
-    total_length = _weighted_length(text)
-    low, high = _MIN_FONT_SIZE, base_size
-    while high - low > 0.01:
-        mid = (low + high) / 2
-        capacity = int(_MAX_WIDTH_UNITS / mid) * int(_MAX_HEIGHT_UNITS / mid)
-        if total_length > capacity:
-            high = mid
+def wrap_lines(number: str, text: str, size: Length, area: TextArea = DEFAULT_TEXT_AREA) -> list[str]:
+    """模擬 PowerPoint 的換行，回傳每一行的經文（不含節數）。
+
+    - 第一行從 Tab 位置開始，之後各行從經文欄開始。
+    - 行尾放不下的結束標點（，。」等）可以懸掛在右邊界外，但每行只能懸掛一個；
+      第二個也放不下時（如「子。」」），連同前一個字一起移到下一行，避免下一行以標點開頭。
+    - 開頭標點（「等）不留在行尾，跟著下一個字換行。
+    """
+    column, tab = _verse_indent(number, text, size)
+    limit = (area.width - tab) / size
+    lines, line, used, hanging = [], "", 0.0, False
+    for char in text:
+        width = _char_width_em(char)
+        if used + width <= limit - _FIT_MARGIN_EM:
+            line += char
+            used += width
+            continue
+        if char in _CLOSING_PUNCTUATION and line and not hanging:
+            line += char
+            used += width
+            hanging = True
+            continue
+        if char in _CLOSING_PUNCTUATION:
+            # 已經有標點懸掛：把行尾的標點連同前一個字移到下一行
+            split = len(line)
+            while split > 0 and line[split - 1] in _CLOSING_PUNCTUATION:
+                split -= 1
+            split = max(split - 1, 1)
         else:
-            low = mid
-    return Pt(min(max(low, _MIN_FONT_SIZE), base_size))
+            split = len(line)
+            while split > 1 and line[split - 1] in _NO_LINE_END:
+                split -= 1
+        lines.append(line[:split])
+        line = line[split:] + char
+        used = sum(_char_width_em(c) for c in line)
+        limit = (area.width - column) / size
+        hanging = False
+    lines.append(line)
+    return lines
+
+
+def fits(number: str, text: str, size: Length, area: TextArea = DEFAULT_TEXT_AREA) -> bool:
+    lines = len(wrap_lines(number, text, size, area))
+    return lines * _LINE_HEIGHT_EM * size <= area.height
+
+
+def calculate_font_size(number: str, text: str, area: TextArea = DEFAULT_TEXT_AREA) -> Pt:
+    """從最大字體往下找，回傳第一個放得下的字體；最小字體仍放不下時回傳最小字體。"""
+    size = _BASE_FONT_SIZE
+    while size > _MIN_FONT_SIZE and not fits(number, text, Pt(size), area):
+        size -= _FONT_SIZE_STEP
+    return Pt(size)

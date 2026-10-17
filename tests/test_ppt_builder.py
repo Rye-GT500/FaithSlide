@@ -5,7 +5,7 @@ from pptx.util import Pt
 
 from faithslide import paths
 from faithslide.bible_api import Verse
-from faithslide.ppt_builder import SlideBuilder, TemplateError, calculate_font_size
+from faithslide.ppt_builder import SlideBuilder, TemplateError, calculate_font_size, fits, wrap_lines
 from faithslide.sermon_parser import MAJOR, MEDIUM, MINOR, Section
 from tests.slide_extract import extract_slides
 
@@ -67,7 +67,7 @@ def test_verse(tmp_path):
     # 節數與經文使用相同字體大小（XML 以 1/100 點儲存）
     sizes = [run[1] for run in long_number["shapes"][1][0][:2]]
     assert sizes[0] == sizes[1]
-    assert abs(sizes[0] - calculate_font_size("神愛世人， 甚至")) <= Pt(0.01)
+    assert abs(sizes[0] - calculate_font_size("16.", "神愛世人， 甚至")) <= Pt(0.01)
 
 
 def test_verse_psalm_title(tmp_path):
@@ -96,13 +96,64 @@ def test_template_with_too_few_slides(tmp_path):
     ("字" * 2000, Pt(20)),
 ])
 def test_calculate_font_size_bounds(text, expected):
-    assert abs(calculate_font_size(text) - expected) <= Pt(0.01)
+    assert abs(calculate_font_size("16.", text) - expected) <= Pt(0.01)
 
 
 def test_calculate_font_size_shrinks_with_length():
-    sizes = [calculate_font_size("字" * n) for n in (10, 50, 100, 200)]
+    sizes = [calculate_font_size("16.", "字" * n) for n in (10, 50, 100, 200)]
     assert sizes == sorted(sizes, reverse=True)
     assert sizes[0] > sizes[-1]
+
+
+@pytest.mark.parametrize("n", [20, 40, 60, 80, 120, 200])
+def test_calculate_font_size_is_largest_that_fits(n):
+    text = "神愛世人，甚至將他的獨生子賜給他們。" * 20
+    text = text[:n]
+    size = calculate_font_size("16.", text)
+    assert fits("16.", text, size)
+    if size < Pt(72):
+        assert not fits("16.", text, size + Pt(0.5))
+
+
+def test_wider_number_column_gets_smaller_or_equal_font():
+    text = "字" * 70
+    assert calculate_font_size("176.", text) <= calculate_font_size("1.", text)
+
+
+def test_too_long_verse_reported(tmp_path):
+    builder = SlideBuilder(paths.TEMPLATE_PPTX)
+    assert builder.add_verse("標題", Verse(1, "短")) is True
+    assert builder.add_verse("標題", Verse(1, "字" * 2000)) is False
+
+
+# --- 換行模擬（規則以 PowerPoint 實際排版校準） ---------------------------------
+
+def test_wrap_lines_width_follows_number_column():
+    # 72 點、節數「16.」：經文欄從 1.696 個字寬開始，可用 (945.6 - 122.1) / 72 = 11.4 個字
+    lines = wrap_lines("16.", "一二三四五六七八九十甲乙丙丁戊", Pt(72))
+    assert lines == ["一二三四五六七八九十甲", "乙丙丁戊"]
+
+
+def test_wrap_lines_one_closing_punctuation_hangs():
+    # 第 12 個字是「，」：懸掛在行尾，不換行
+    lines = wrap_lines("16.", "一二三四五六七八九十甲，乙丙", Pt(72))
+    assert lines == ["一二三四五六七八九十甲，", "乙丙"]
+
+
+def test_wrap_lines_second_closing_punctuation_moves_with_previous_char():
+    # 「。」懸掛後「」」也放不下：連同前一個字「甲」移到下一行，避免下一行以標點開頭
+    lines = wrap_lines("16.", "一二三四五六七八九十甲。」乙", Pt(72))
+    assert lines == ["一二三四五六七八九十", "甲。」乙"]
+
+
+def test_wrap_lines_opening_punctuation_not_left_at_line_end():
+    lines = wrap_lines("16.", "一二三四五六七八九十「甲乙", Pt(72))
+    assert lines == ["一二三四五六七八九十", "「甲乙"]
+
+
+def test_wrap_lines_narrow_punctuation():
+    # 「‧」只有 0.254 個字寬，一行可以多放
+    assert wrap_lines("16.", "一二三‧四五六七八九十甲", Pt(72)) == ["一二三‧四五六七八九十甲"]
 
 
 def _verse_paragraph_props(tmp_path, number, text):
@@ -124,7 +175,7 @@ def _number_em(number):
 def test_verse_hanging_indent_matches_number_width(tmp_path, number, text):
     """換行後的文字要和第一行經文對齊：凸排距離與 Tab 定位點都等於節數欄寬，且隨字體大小縮放。"""
     from faithslide.ppt_builder import _NUMBER_GAP_EM
-    expected = round(calculate_font_size(text) * (_number_em(number) + _NUMBER_GAP_EM))
+    expected = round(calculate_font_size(f"{number}.", text) * (_number_em(number) + _NUMBER_GAP_EM))
     assert _verse_paragraph_props(tmp_path, number, text) == (expected, -expected, [(expected, "l")])
 
 
@@ -133,7 +184,7 @@ def test_opening_punctuation_hangs_left(tmp_path, mark):
     """標點懸掛：Tab 停在節數後，標點字格在經文欄左側，後面的字與換行後的文字同在經文欄。"""
     from faithslide.ppt_builder import _HANGING_GAP_EM
     text = mark + "神愛世人" * 10
-    size = calculate_font_size(text)
+    size = calculate_font_size("16.", text)
     tab = round(size * (_number_em(16) + _HANGING_GAP_EM))
     column = round(size * (_number_em(16) + _HANGING_GAP_EM + 1))
     assert _verse_paragraph_props(tmp_path, 16, text) == (column, -column, [(tab, "l")])
