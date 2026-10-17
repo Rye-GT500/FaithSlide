@@ -41,6 +41,9 @@ class SlidePage(ttk.Frame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
+    def on_show(self):
+        self.focus_set()
+
     def on_return(self, event=None):
         self.start()
 

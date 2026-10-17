@@ -1,92 +1,77 @@
-"""經文查詢頁。"""
+"""經文查詢頁：單一輸入框，接受全名、簡寫或別名。"""
 import logging
+import re
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from faithslide import bible_api, bible_books
+from faithslide import bible_api
 from faithslide.bible_api import BibleApiError
+from faithslide.reference_parser import ReferenceParseError, format_title, parse
 
 logger = logging.getLogger(__name__)
 
-LABEL_FONT = ("微軟正黑體", 12)
+HINT = "例：約3:16-18、約翰福音3:16,18、詩23（整章）；多段以「；」分隔"
+
+
+def lookup(query: str) -> tuple[list[str], list[str]]:
+    """查詢經文，回傳 (要顯示的文字行, 問題訊息)。輸入格式錯誤時拋出 ReferenceParseError。"""
+    segments = [s for s in re.split(r"[;；]", query) if s.strip()]
+    if not segments:
+        raise ReferenceParseError("請輸入要查詢的經文")
+    refs = [ref for segment in segments for ref in parse(segment)]
+
+    lines, problems = [], []
+    for ref in refs:
+        try:
+            chapter = {v.number: v for v in bible_api.get_chapter(ref.book, ref.chapter)}
+        except BibleApiError as e:
+            problems.append(f"{format_title(ref)}：{e}")
+            continue
+        for verse_range in ref.ranges or [None]:
+            title = format_title(ref, verse_range)
+            start, end = verse_range or (min(chapter), max(chapter))
+            found = [chapter[n] for n in range(start, end + 1) if n in chapter]
+            if len(found) < end - start + 1:
+                first_missing = next(n for n in range(start, end + 1) if n not in chapter)
+                problems.append(f"{title}：本章沒有第 {first_missing} 節")
+            if found:
+                lines += [f"【{title}】", *(f"{v.number}. {v.text}" for v in found), ""]
+    return lines, problems
 
 
 class SearchPage(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
-        self.book_var = tk.StringVar()
-        self.chapter_var = tk.StringVar()
-        self.verse_var = tk.StringVar()
+        self.query_var = tk.StringVar()
 
         ttk.Label(self, text="📖 聖經經文查詢", font=("微軟正黑體", 16, "bold")).grid(row=0, column=0, columnspan=2, pady=(0, 20))
 
-        ttk.Label(self, text="書卷：", font=LABEL_FONT).grid(row=1, column=0, sticky="e", padx=5, pady=5)
-        books = [book.abbr for book in bible_books.all_books()]
-        ttk.Combobox(self, textvariable=self.book_var, values=books, width=15).grid(row=1, column=1, padx=5, pady=5, sticky="w")
-
-        ttk.Label(self, text="章：", font=LABEL_FONT).grid(row=2, column=0, sticky="e", padx=5, pady=5)
-        ttk.Entry(self, textvariable=self.chapter_var, width=18).grid(row=2, column=1, padx=5, pady=5, sticky="w")
-
-        ttk.Label(self, text="節：", font=LABEL_FONT).grid(row=3, column=0, sticky="e", padx=5, pady=5)
-        ttk.Entry(self, textvariable=self.verse_var, width=18).grid(row=3, column=1, padx=5, pady=5, sticky="w")
-
-        ttk.Button(self, text="查詢", command=self.search).grid(row=4, column=0, columnspan=2, pady=(15, 0))
+        self.entry = ttk.Entry(self, textvariable=self.query_var, font=("微軟正黑體", 12))
+        self.entry.grid(row=1, column=0, sticky="ew", padx=(10, 5), pady=5)
+        ttk.Button(self, text="查詢", command=self.search).grid(row=1, column=1, sticky="w", padx=(5, 10), pady=5)
+        ttk.Label(self, text=HINT, foreground="gray").grid(row=2, column=0, columnspan=2, sticky="w", padx=10)
 
         self.text_box = tk.Text(self, wrap="word")
-        self.text_box.grid(row=6, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+        self.text_box.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
 
-        for i in range(6):
-            self.grid_rowconfigure(i, weight=1)
+        self.grid_rowconfigure(3, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1)
+
+    def on_show(self):
+        self.entry.focus_set()
 
     def on_return(self, event=None):
         self.search()
 
     def search(self):
-        book_name = self.book_var.get().strip()
-        chapter_text = self.chapter_var.get().strip()
-        verse_text = self.verse_var.get().strip()
-
-        if not book_name or not chapter_text:
-            messagebox.showwarning("輸入錯誤", "請選擇書卷與章節")
-            return
-        book = bible_books.resolve(book_name)
-        if book is None:
-            messagebox.showwarning("輸入錯誤", "書卷名稱錯誤")
-            return
-        if not chapter_text.isdigit():
-            messagebox.showwarning("輸入錯誤", "章數必須是數字")
-            return
-        start, end = None, None
-        if verse_text:
-            parts = [p.strip() for p in verse_text.split("-", 1)]
-            if not all(p.isdigit() for p in parts):
-                messagebox.showwarning("輸入錯誤", "節數格式錯誤")
-                return
-            start, end = int(parts[0]), int(parts[-1])
-
+        query = self.query_var.get()
         try:
-            verses = bible_api.get_chapter(book, int(chapter_text))
-        except BibleApiError as e:
-            self._show([str(e)])
+            lines, problems = lookup(query)
+        except ReferenceParseError as e:
+            messagebox.showwarning("輸入錯誤", str(e))
             return
-
-        if start is None:
-            self._show(verses)
-            return
-        by_number = {v.number: v for v in verses}
-        selected = []
-        for number in range(start, end + 1):
-            if number not in by_number:
-                messagebox.showwarning("輸入錯誤", "節數錯誤")
-                break
-            selected.append(by_number[number])
-        self._show(selected)
-        logger.info(f"查詢 {book.full} 第 {chapter_text} 章 {verse_text}")
-
-    def _show(self, lines):
         self.text_box.delete(1.0, tk.END)
-        for line in lines:
-            text = line if isinstance(line, str) else f"{line.number}. {line.text}"
-            self.text_box.insert(tk.END, text + "\n")
+        self.text_box.insert(tk.END, "\n".join(lines))
+        logger.info(f"查詢 {query}")
+        if problems:
+            messagebox.showwarning("查詢結果", "\n".join(problems))

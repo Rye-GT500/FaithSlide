@@ -54,7 +54,9 @@ class MainWindow:
 
     def _show_page(self, index):
         self.current = index
-        self.pages[index].tkraise()
+        page = self.pages[index]
+        page.tkraise()
+        page.on_show()
 
     def _check_update(self):
         run_in_background(
