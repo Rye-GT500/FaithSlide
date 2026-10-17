@@ -1,6 +1,6 @@
 # FaithSlide SRP 重構企畫書
 
-> 狀態：**已確認，實施中**（第 0～2 階段完成）
+> 狀態：**已確認，實施中**（第 0～3 階段完成）
 > 範圍：`FaithSlide.py`（967 行，單一檔案）→ `faithslide/` 套件
 > 不在範圍內：`BibleDictionary.py`（由作者自行隔離）
 
@@ -141,17 +141,21 @@ class Reference:
     chapter: int
     ranges: tuple[tuple[int, int], ...]   # 空 tuple = 整章
 
-class ReferenceError(ValueError): ...      # 錯誤訊息供 UI 直接顯示
+class ReferenceParseError(ValueError): ...   # 錯誤訊息供 UI 直接顯示（避開內建的 ReferenceError）
 
-def find_references(text: str) -> list[str]
+def find_references(text: str) -> list[str]            # 從一段文字找出引用字串
+def text_before_references(text: str) -> str | None   # 第一個引用之前的文字（供標題擷取）
 def parse(raw: str, default_book: Book | None = None) -> list[Reference]
-def format_title(ref: Reference, verse_part: str) -> str   # 例：「約翰福音三章16-18節」；詩篇改為「篇」
+def format_title(ref: Reference, verse_range: tuple[int, int] | None = None) -> str   # 例：「約翰福音三章16-18節」；詩篇改為「篇」
 def chinese_numeral(n: int) -> str
 ```
 
-- **不支援跨章**（如 `約3:16-4:2`）：`parse` 拋出 `ReferenceError`。
+- **不支援跨章**（如 `約3:16-4:2`）：`parse` 拋出 `ReferenceParseError`。
 - 一個字串可包含多章（如 `約3:16,4:2`），每章各回傳一個 `Reference`。
 - `default_book` 用來取代全域變數 `main_book`。
+- `parse` 會正規化全形符號（`：`、`，`、`－`…）與空白，供查詢頁輸入使用。
+- **刻意保留的舊版行為**：引用正則容許數字中間夾空白，因為 Word 的 run 常把「10」切成「1 0」。代價是「3:16 4:1」這種只以空白分隔、又沒寫書卷的兩組章節會被合併。根本解法是讓 `word_reader` 串接 run 時不插入空白，第 5 階段再評估。
+- 已用 4 份範例週報比對：引用切分、標題擷取、逐節展開的標題與節數，都與舊版完全一致。
 
 **取代的現有程式碼**：`analyze_word` 中的引用正則、`parse_bible_reference`、`process_reference_block`、`analyze_paragraph` 的範圍解析、`num_to_chinese`、`chinese_number`、`number`。
 
@@ -259,7 +263,7 @@ def check() -> UpdateInfo | None    # 失敗或無新版都回傳 None，並記�
 
 | 層 | 做法 |
 |---|---|
-| 核心模組 | 拋出具名例外（`ReferenceError`、`BibleApiError`…），可在 log 記錄細節 |
+| 核心模組 | 拋出具名例外（`ReferenceParseError`、`BibleApiError`…），可在 log 記錄細節 |
 | pipeline | 單一引用失敗：記錄並略過，繼續製作（維持現行容錯行為）；整體失敗：拋出 |
 | ui | 捕捉例外 → `root.after` → `messagebox` |
 
@@ -292,6 +296,7 @@ log 設定在 `main.py` 統一初始化一次，各模組使用 `logging.getLogg
 | 9b. log 位置 | exe 旁 → `%APPDATA%\FaithSlide\FaithSlide.log`（安裝在 Program Files 時無寫入權限）；README 的回報說明需同步更新 |
 | 9c. 使用者自訂別名 | `books.user.json` 讀寫 + 設定 UI |
 | 9d. 查詢頁單一輸入框 | 移除書卷下拉選單與章、節欄位。輸入框接受全名、簡寫或別名（如 `約3:16-18`、`約翰福音3:16`）→ `parse` → 依（書卷, 章）分組查詢 → 依 ranges 篩選顯示 |
+| 9e. 舊版 bug（第 7 階段接上新模組後自動修正，snapshot 不受影響） | 「各」作為縮寫時標題組不出來；章數為整十的三位數（如詩篇 100、110、150）中文數字錯誤（「一百零零」、「一百一十零」） |
 
 ### 打包同步（第 8 階段完成後）
 
