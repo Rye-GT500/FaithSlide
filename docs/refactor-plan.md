@@ -370,5 +370,5 @@ log 設定在 `main.py` 統一初始化一次，各模組使用 `logging.getLogg
 
 ## 8. 後續討論
 
-- build 腳本：以 `version.py` 為唯一版本來源，自動帶入 PyInstaller 與 Inno Setup。
-- 版本號升級規則：大修改、小修改如何判斷與標示（例如 major / minor / patch 由誰、依什麼決定）。
+- ✅ build 腳本：`build.py`，以 `version.py` 為唯一版本來源，自動帶入 PyInstaller 與 Inno Setup，並可 commit、tag、建立 GitHub Release。
+- ✅ 版本號升級規則：依 commit 前綴建議升級幅度、由作者確認。規則與用法見 `docs/release.md`。
