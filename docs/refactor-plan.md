@@ -1,6 +1,6 @@
 # FaithSlide SRP 重構企畫書
 
-> 狀態：**已確認，實施中**（第 0～4 階段完成）
+> 狀態：**已確認，實施中**（第 0～5 階段完成）
 > 範圍：`FaithSlide.py`（967 行，單一檔案）→ `faithslide/` 套件
 > 不在範圍內：`BibleDictionary.py`（由作者自行隔離）
 
@@ -62,6 +62,7 @@ FaitSlide/
 ```
 ui ──► pipeline ──► word_reader
  │         │──────► sermon_parser ──► reference_parser ──► bible_books
+ │         │              └─────────► bible_api（只用 Verse 型別）
  │         │──────► bible_api ─────────────────────────────► bible_books
  │         └──────► ppt_builder
  ├──► reference_parser / bible_api      （查詢頁）
@@ -193,22 +194,40 @@ def read(path: str) -> WeeklyReport
 ```python
 @dataclass
 class Section:              # 大/中/小標題共用，以 children 表示階層
-    number: str             # 「一、」「1.」「(1)」
-    text: str
-    references: list[Reference]
+    level: int              # MAJOR / MEDIUM / MINOR
+    number: str             # 「一」「1」
+    text: str               # 編號之後的標題文字
+    references: list[str]   # 未解析的引用字串（書卷可能省略）
     children: list["Section"]
 
 @dataclass
 class Sermon:
     title: str
+    references: list[str]   # 主標題後的引用
     sections: list[Section]
+    warnings: list[str]
 
-def parse_sermon(text: str, default_book: Book | None, speaker_words: list[str]) -> Sermon
-def parse_reading(lines: list[str]) -> ...        # 讀經段落解析（主經文、書卷推斷）
+@dataclass
+class Passage: title: str; verses: list[Verse]
+
+@dataclass
+class Reading:
+    passages: list[Passage]
+    main_book: Book | None  # 證道引用省略書卷時使用
+    warnings: list[str]
+
+def parse_sermon(text: str, speaker_words: list[str]) -> Sermon
+def parse_reading(lines: list[str]) -> Reading
+def find_book_in(text: str) -> Book | None
 ```
 
 - **標題切分正則**（`一、` / `1.` / `1)`）放在這裡。
 - 要移除的講員字串（`證道`、`牧師`、人名…）**移到設定檔**（`settings.default.json` 的 `speaker_words`，使用者可在 `settings.json` 覆寫），由呼叫端傳入 `parse_sermon`，parser 本身不讀檔。
+- **與原規劃的差異**：引用保留為未解析字串，由 pipeline 以 `Reading.main_book` 解析。這樣 `parse_sermon` 不需要知道主經文，引用錯誤也統一在 pipeline 處理。
+- `Verse` 沿用 `bible_api.Verse`（讀經經文與查詢經文共用同一型別）。
+- 讀經支援兩種格式：A. 標題行 + `[n]` 經文行（可多個標題行）；B. 第一行以「，」列出多段，經文行依節數依序分配。
+- 解析問題記錄在 `warnings`，不再中斷整份製作。
+- 已用 4 份範例週報比對：舊版投影片函式呼叫序列（主標題、大/中/小標題、163 節經文的標題與內容）與新模組推導結果完全一致。
 
 **取代的現有程式碼**：`analyze_word`、`produce_the_slides` 中的大綱建構與讀經解析段落。
 
@@ -299,7 +318,7 @@ log 設定在 `main.py` 統一初始化一次，各模組使用 `logging.getLogg
 | 9b. log 位置 | exe 旁 → `%APPDATA%\FaithSlide\FaithSlide.log`（安裝在 Program Files 時無寫入權限）；README 的回報說明需同步更新 |
 | 9c. 使用者自訂別名 | `books.user.json` 讀寫 + 設定 UI |
 | 9d. 查詢頁單一輸入框 | 移除書卷下拉選單與章、節欄位。輸入框接受全名、簡寫或別名（如 `約3:16-18`、`約翰福音3:16`）→ `parse` → 依（書卷, 章）分組查詢 → 依 ranges 篩選顯示 |
-| 9e. 舊版 bug（第 7 階段接上新模組後自動修正，snapshot 不受影響） | 「各」作為縮寫時標題組不出來；章數為整十的三位數（如詩篇 100、110、150）中文數字錯誤（「一百零零」、「一百一十零」） |
+| 9e. 舊版 bug（第 7 階段接上新模組後自動修正，snapshot 不受影響） | 「各」作為縮寫時標題組不出來；章數為整十的三位數（如詩篇 100、110、150）中文數字錯誤（「一百零零」、「一百一十零」）；二位數標題編號（`10.`、`十一、`）被從中間切開；主標題後接引用、中標題沒有引用、小標題出現在中標題前時，整份證道或整個段落製作失敗；讀經缺少時整份製作失敗；讀經格式 B 的書名含中文數字（如約翰一書）時被切成「約翰」；無引用的標題保留了 Word run 產生的空白；標題文字或讀經經文含第二個分隔符號（如 `1.a.b`）時被截斷 |
 | 9f. 可疑引用提示（非首要） | 偵測使用者輸入失誤（如「3:16 4:1」被合併成「3:164」導致節數超出該章），提示使用者而非默默略過 |
 
 ### 打包同步（第 8 階段完成後）
