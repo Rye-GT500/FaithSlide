@@ -52,7 +52,7 @@ python build.py --pre beta      # 新版本加上 -beta
 python build.py --no-bump       # 不升版，用目前版本重新打包
 python build.py --dry-run       # 只顯示會做什麼，不執行
 python build.py --no-release    # 打包、commit、tag，但不 push、不建立 GitHub Release
-python build.py --notes 說明.md  # 用自己寫的 Release 說明（例如 commit 沒有前綴時）
+python build.py --notes docs/release-notes/1.3.0.md  # 用自己寫的 Release 說明（存放於 docs/release-notes）
 python build.py --no-git        # 只打包（本機測試用），不改版本、不動 git
 ```
 
