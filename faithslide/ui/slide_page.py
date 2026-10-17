@@ -79,7 +79,7 @@ class SlidePage(ttk.Frame):
             messagebox.showwarning("輸入錯誤", "請先選擇 PPT 儲存位置")
             return
         self.produce_btn.state(["disabled"])
-        self._set_progress(0, "開始製作")
+        self._set_progress(0, "準備中…")
         run_in_background(
             self,
             lambda report_progress: pipeline.generate(word_path, ppt_path, report_progress),
@@ -91,7 +91,7 @@ class SlidePage(ttk.Frame):
     def _set_progress(self, progress, message):
         percent = progress * 100
         self.progress_bar.config(value=percent)
-        self.status_var.set(f"進度 {percent:.2f}% : {message}")
+        self.status_var.set(f"{percent:.0f}%　{message}")
 
     def _finish(self, warnings):
         self.produce_btn.state(["!disabled"])

@@ -123,3 +123,18 @@ def test_merged_references_get_missing_comma_hint(tmp_path, chapters):
     # 「3:1 4:1」被合併成「3:14」，超出本章範圍
     result, _, _ = run(tmp_path, "主標題 一、大標題 羅 3:1 4:1")
     assert any("少了逗號" in w and "羅 3:1 4" in w for w in result.warnings)
+
+
+def test_progress_reports_each_chapter(tmp_path, chapters):
+    docx = make_report(tmp_path / "in.docx", [
+        ("讀經", READING), ("證道", [("主標題 一、大標題 3:1 羅 1:1,2:1 1. 中標題 羅 1:2", True)]),
+    ])
+    progress = []
+    pipeline.generate(docx, str(tmp_path / "out.pptx"), lambda p, m: progress.append((p, m)))
+    values = [p for p, _ in progress]
+    messages = [m for _, m in progress]
+    assert values == sorted(values) and values[0] == 0.0 and values[-1] == 1.0
+    fetch = [m for m in messages if m.startswith("查詢經文：")]
+    # 約翰福音三章、羅馬書一章、羅馬書二章，各一次（重複的章只查一次）
+    assert len(fetch) == 3 and all(m.endswith(f"（{n}/3）") for n, m in enumerate(fetch, 1))
+    assert {"讀取 Word…", "製作投影片…", "存檔中…", "製作完畢"} <= set(messages)

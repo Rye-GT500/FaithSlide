@@ -97,3 +97,39 @@ def test_failure_not_cached(fake_get):
         bible_api.get_chapter(book, 3)
     fake_get.response = success((1, "x"))
     assert bible_api.get_chapter(book, 3) == [Verse(1, "x")]
+
+
+def test_get_chapters_dedupes_and_collects_errors(monkeypatch):
+    import threading
+    import time
+    calls, active, peak = [], [0], [0]
+    lock = threading.Lock()
+
+    def fake(book, chapter):
+        with lock:
+            calls.append((book.id, chapter))
+            active[0] += 1
+            peak[0] = max(peak[0], active[0])
+        time.sleep(0.02)
+        with lock:
+            active[0] -= 1
+        if chapter == 99:
+            raise BibleApiError("查無經文")
+        return [Verse(1, f"{book.abbr}{chapter}")]
+
+    monkeypatch.setattr(bible_api, "get_chapter", fake)
+    john, romans = bible_books.resolve("約"), bible_books.resolve("羅")
+    progress = []
+    wanted = [(john, n) for n in range(1, 9)] + [(john, 1), (romans, 99)]
+    results = bible_api.get_chapters(wanted, lambda done, total, book, chapter: progress.append((done, total)))
+
+    assert sorted(calls) == sorted(set(calls))              # 同一章只查一次
+    assert len(results) == 9
+    assert results[("jhn", 3)] == [Verse(1, "約3")]
+    assert isinstance(results[("rom", 99)], BibleApiError)  # 錯誤收集起來，不中斷其他章
+    assert progress == [(n, 9) for n in range(1, 10)]
+    assert 1 < peak[0] <= bible_api.MAX_CONCURRENT_REQUESTS  # 有同時查詢，但不超過上限
+
+
+def test_get_chapters_empty():
+    assert bible_api.get_chapters([]) == {}

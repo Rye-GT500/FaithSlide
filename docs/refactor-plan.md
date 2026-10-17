@@ -285,6 +285,8 @@ def generate(word_path: str, ppt_path: str,
 - 已驗證：snapshot 測試改為以 pipeline 產生（離線），4 份與基準完全一致、無警告；另以實際 API 連網執行，結果相同。
 - 第 8 階段已改接 pipeline，並移除 `FaithSlide.py`、`tests/legacy_runner.py`、`tests/make_baseline.py`（基準已凍結，API 錄製資料保留）。刻意改變輸出時，以 `python -m tests.update_snapshots` 重新產生 snapshot。
 
+- 流程：先解析證道所有引用、列出用到的章節，以 `bible_api.get_chapters` 同時查詢（最多 4 章），再依大綱順序製作投影片；警告仍依投影片順序產生。
+- 進度：讀取 Word 0%、查詢經文 10%～90%（依已查完的章數）、製作投影片 90%、存檔 97%、完成 100%。查詢經文約占總時間九成五，改為同時查詢後總時間約減半。
 - 投影片順序：讀經經文 → 主標題（2 張）→ **主標題後的引用經文**（作者決定：偶爾會出現，予以製作）→ 各大標題、其引用 → 各中標題、其引用 → 各小標題、其引用。
 - 證道經文去除空白後再放入投影片（沿用舊版）。
 
