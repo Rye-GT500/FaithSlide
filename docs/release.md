@@ -34,7 +34,33 @@ commit 第一行以前綴開頭，`build.py` 依此建議升級幅度：
 
 ## 發版
 
-### 事前準備（只需一次）
+有兩種方式，結果相同（GitHub Release 附上安裝檔）：
+
+| 方式 | 適用 | 打包在哪裡 |
+|---|---|---|
+| `python build.py --remote` | 任何電腦（包含 Mac） | GitHub Actions 的 Windows 環境 |
+| `python build.py` | 已安裝 Inno Setup 與 gh 的 Windows 電腦 | 本機 |
+
+### 用 GitHub Actions 打包（推薦）
+
+```
+python build.py --remote                 # 依 commit 前綴建議升級幅度，確認後執行
+python build.py --remote --bump minor    # 直接指定升級幅度
+```
+
+1. 檢查 git 工作目錄乾淨、抓取遠端 tag，決定版本號。
+2. 執行 pytest，失敗則中止。
+3. 改寫 `faithslide/version.py`，commit 並建立 tag `v<版本>`。
+4. 確認後 push 目前分支與 tag。
+5. tag 推上 GitHub 後，`.github/workflows/release.yml` 會在 Windows 上執行 `python build.py --publish`：再跑一次測試、PyInstaller 打包、Inno Setup 產生安裝檔，建立 Release 並上傳安裝檔。進度可在 GitHub 的 Actions 頁面查看。
+
+- 本機只需要 git 能 push，不需要 Inno Setup 或 gh。
+- Release 說明：若 `docs/release-notes/<版本>.md` 存在就使用它（**請在執行前先 commit**），否則依 commit 前綴自動產生。
+- Inno Setup 版本固定在 workflow 的 `INNO_SETUP_VERSION`。
+
+### 在本機 Windows 打包
+
+#### 事前準備（只需一次）
 
 1. 安裝 Inno Setup 6（預設路徑 `C:\Program Files (x86)\Inno Setup 6\`）。
 2. 安裝 GitHub CLI 並登入：
@@ -43,7 +69,7 @@ commit 第一行以前綴開頭，`build.py` 依此建議升級幅度：
    gh auth login
    ```
 
-### 執行
+#### 執行
 
 ```
 python build.py                 # 依 commit 前綴建議升級幅度，確認後執行

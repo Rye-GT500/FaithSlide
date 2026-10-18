@@ -1,0 +1,36 @@
+name: 發版
+
+# 推送版本 tag（由 python build.py --remote 建立）時，在 Windows 上打包並建立 GitHub Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  INNO_SETUP_VERSION: 6.7.1
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 產生 Release 說明需要上一個版本的 tag
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: 安裝 Inno Setup 與繁體中文語系檔
+        run: |
+          choco install innosetup --version $env:INNO_SETUP_VERSION -y --no-progress
+          $tag = "is-" + $env:INNO_SETUP_VERSION.Replace(".", "_")
+          Invoke-WebRequest "https://raw.githubusercontent.com/jrsoftware/issrc/$tag/Files/Languages/Unofficial/ChineseTraditional.isl" `
+            -OutFile "C:\Program Files (x86)\Inno Setup 6\Languages\ChineseTraditional.isl"
+      - name: 打包並建立 Release
+        run: python build.py --publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONUTF8: "1"

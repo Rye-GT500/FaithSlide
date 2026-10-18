@@ -156,12 +156,13 @@ def find_iscc() -> Path:
     return iscc
 
 
-def commits_since_last_tag(runner) -> tuple[str | None, list[Commit]]:
+def commits_since_last_tag(runner, rev: str = "HEAD") -> tuple[str | None, list[Commit]]:
+    """rev 之前最近的版本 tag，以及該 tag 到 rev 之間的 commit。"""
     try:
-        last_tag = git(runner, "describe", "--tags", "--abbrev=0", "--match", "v*", side_effect=False)
+        last_tag = git(runner, "describe", "--tags", "--abbrev=0", "--match", "v*", f"{rev}^", side_effect=False)
     except BuildError:
         last_tag = None
-    log_range = f"{last_tag}..HEAD" if last_tag else "HEAD"
+    log_range = f"{last_tag}..{rev}" if last_tag else rev
     subjects = git(runner, "log", log_range, "--format=%s", side_effect=False).splitlines()
     return last_tag, [classify(s) for s in subjects if s]
 
@@ -200,6 +201,61 @@ def build_installer(runner, version: str) -> Path:
     return ROOT / "Output" / f"{APP_NAME}-Setup-{version}.exe"
 
 
+def notes_file(version: str) -> Path:
+    """GitHub Actions 發版時使用的 Release 說明檔；不存在時依 commit 產生。"""
+    return ROOT / "docs" / "release-notes" / f"{version}.md"
+
+
+def find_gh(runner) -> Path:
+    gh = find_tool("gh", GH_CANDIDATES)
+    if not gh:
+        raise BuildError("找不到 GitHub CLI（gh），請先安裝並執行 gh auth login，或改用 --no-release")
+    runner.run(gh, "auth", "status", side_effect=False)
+    return gh
+
+
+def create_release(runner, gh, repo: str, tag: str, version: str, installer: Path, notes_text: str) -> None:
+    print(f"Release 說明：\n{notes_text}\n")
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as notes:
+        notes.write(notes_text)
+    try:
+        gh_args = [gh, "release", "create", tag, installer, "--repo", repo,
+                   "--title", f"{APP_NAME} {version}", "--notes-file", notes.name]
+        if "-" in version:
+            gh_args.append("--prerelease")
+        runner.run(*gh_args)
+    finally:
+        os.unlink(notes.name)
+
+
+def publish(runner, version_text: str) -> None:
+    """GitHub Actions 使用：替目前版本的 tag 打包，並建立 Release。"""
+    version = read_version(version_text)
+    tag = f"v{version}"
+    repo = github_repo(version_text)
+
+    print("1. 檢查環境")
+    if tag not in git(runner, "tag", "--points-at", "HEAD", side_effect=False).split():
+        raise BuildError(f"目前的 commit 沒有 tag {tag}，與 version.py 的版本不符")
+    find_iscc()
+    gh = find_gh(runner)
+
+    print("\n2. 執行測試")
+    runner.run(sys.executable, "-m", "pytest", "-q", side_effect=False)
+
+    print("\n3. 打包")
+    build_executable(runner)
+    installer = build_installer(runner, version)
+
+    print("\n4. 發佈 GitHub Release")
+    if notes_file(version).exists():
+        notes_text = notes_file(version).read_text(encoding="utf-8")
+    else:
+        notes_text = release_notes(commits_since_last_tag(runner, tag)[1])
+    create_release(runner, gh, repo, tag, version, installer, notes_text)
+    print("\n完成。")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="FaithSlide 打包與發版")
     parser.add_argument("--bump", choices=["major", "minor", "patch", "release"])
@@ -208,6 +264,9 @@ def main(argv=None):
     parser.add_argument("--notes", type=Path, help="Release 說明檔（Markdown），取代依 commit 產生的說明")
     parser.add_argument("--no-release", action="store_true", help="不 push、不建立 GitHub Release")
     parser.add_argument("--no-git", action="store_true", help="只打包，不改版本、不動 git")
+    parser.add_argument("--remote", action="store_true",
+                        help="不在本機打包：升版、commit、tag 並 push，由 GitHub Actions 打包並建立 Release（Mac 可用）")
+    parser.add_argument("--publish", action="store_true", help="GitHub Actions 使用：替目前版本的 tag 打包並建立 Release")
     parser.add_argument("--allow-dirty", action="store_true", help="允許有未 commit 的變更")
     parser.add_argument("--dry-run", action="store_true", help="只顯示會做什麼")
     parser.add_argument("-y", "--yes", action="store_true", help="所有確認都回答是")
@@ -215,7 +274,13 @@ def main(argv=None):
     runner = Runner(args.dry_run)
 
     version_text = VERSION_FILE.read_text(encoding="utf-8")
+    if args.publish:
+        publish(runner, version_text)
+        return
     current = read_version(version_text)
+    if args.remote and (args.notes or args.no_git or args.no_release):
+        raise BuildError("--remote 不可與 --notes、--no-git、--no-release 同時使用；"
+                         "Release 說明請放在 docs/release-notes/<版本>.md 並先 commit")
     release = not (args.no_release or args.no_git)
     if args.notes and not args.notes.exists():
         raise BuildError(f"找不到 Release 說明檔：{args.notes}")
@@ -223,13 +288,11 @@ def main(argv=None):
     print("1. 檢查環境")
     if not args.allow_dirty and git(runner, "status", "--porcelain", side_effect=False):
         raise BuildError("工作目錄有未 commit 的變更（可用 --allow-dirty 略過）")
-    find_iscc()
-    if release:
-        gh = find_tool("gh", GH_CANDIDATES)
-        if not gh:
-            raise BuildError("找不到 GitHub CLI（gh），請先安裝並執行 gh auth login，或改用 --no-release")
-        repo = github_repo(version_text)
-        runner.run(gh, "auth", "status", side_effect=False)
+    if not args.remote:
+        find_iscc()
+    repo = github_repo(version_text)
+    if release and not args.remote:
+        gh = find_gh(runner)
     if not args.no_git:
         git(runner, "fetch", "--tags", "--quiet", side_effect=False)
 
@@ -243,20 +306,24 @@ def main(argv=None):
     if not args.no_git and git(runner, "tag", "--list", tag, side_effect=False):
         raise BuildError(f"tag {tag} 已存在；只想重新打包請用 --no-git")
     print(f"版本：{current} → {version}")
+    if args.remote:
+        source = notes_file(version) if notes_file(version).exists() else "依 commit 自動產生"
+        print(f"Release 說明：{source}")
 
     print("\n3. 執行測試")
     runner.run(sys.executable, "-m", "pytest", "-q", side_effect=False)
 
-    print("\n4. 打包")
     if version != current and not args.dry_run:
         VERSION_FILE.write_text(replace_version(version_text, version), encoding="utf-8")
-    try:
-        exe = build_executable(runner)
-        installer = build_installer(runner, version)
-    except BaseException:
-        VERSION_FILE.write_text(version_text, encoding="utf-8")   # 打包失敗時還原版本號
-        raise
-    print(f"執行檔：{exe}\n安裝檔：{installer}")
+    if not args.remote:
+        print("\n4. 打包")
+        try:
+            exe = build_executable(runner)
+            installer = build_installer(runner, version)
+        except BaseException:
+            VERSION_FILE.write_text(version_text, encoding="utf-8")   # 打包失敗時還原版本號
+            raise
+        print(f"執行檔：{exe}\n安裝檔：{installer}")
 
     if args.no_git:
         return
@@ -270,23 +337,17 @@ def main(argv=None):
         print(f"\n完成。尚未 push；發版時執行 git push origin HEAD {tag}")
         return
     print("\n6. 發佈 GitHub Release")
-    if not confirm(f"即將 push 目前分支與 {tag}，並在 {repo} 建立 Release，確定？", args.yes):
-        print(f"已略過。之後可執行 git push origin HEAD {tag}，再手動建立 Release")
+    where = "由 GitHub Actions 打包並建立 Release" if args.remote else f"在 {repo} 建立 Release"
+    if not confirm(f"即將 push 目前分支與 {tag}，並{where}，確定？", args.yes):
+        print(f"已略過。之後可執行 git push origin HEAD {tag}" + ("" if args.remote else "，再手動建立 Release"))
         return
     git(runner, "push", "origin", "HEAD")
     git(runner, "push", "origin", tag)
+    if args.remote:
+        print(f"\n已 push。打包進度：https://github.com/{repo}/actions")
+        return
     notes_text = args.notes.read_text(encoding="utf-8") if args.notes else release_notes(commits)
-    print(f"Release 說明：\n{notes_text}\n")
-    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as notes:
-        notes.write(notes_text)
-    try:
-        gh_args = [gh, "release", "create", tag, installer, "--repo", repo,
-                   "--title", f"{APP_NAME} {version}", "--notes-file", notes.name]
-        if "-" in version:
-            gh_args.append("--prerelease")
-        runner.run(*gh_args)
-    finally:
-        os.unlink(notes.name)
+    create_release(runner, gh, repo, tag, version, installer, notes_text)
     print("\n完成。")
 
 
