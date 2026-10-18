@@ -3,7 +3,7 @@ import pytest
 from faithslide import bible_api
 from faithslide.bible_api import BibleApiError, Verse
 from faithslide.reference_parser import ReferenceParseError
-from faithslide.ui.search_page import lookup
+from faithslide.verse_search import lookup
 
 
 @pytest.fixture(autouse=True)

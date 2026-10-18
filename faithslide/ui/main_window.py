@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from faithslide import bible_books, updater
-from faithslide.ui.background import run_in_background
+from faithslide.background import run_in_background
 from faithslide.ui.search_page import SearchPage
 from faithslide.ui.settings_dialog import SettingsDialog
 from faithslide.ui.slide_page import SlidePage

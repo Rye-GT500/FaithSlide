@@ -182,6 +182,6 @@ def test_install_starts_silent_installer(monkeypatch):
 
 
 def test_plain_notes():
-    from faithslide.ui.update_dialog import plain_notes
+    from faithslide.updater import plain_notes
     markdown = "說明\r\n\r\n## 修正\r\n\r\n- **超出**：已修正\r\n  - 子項目 `code`\r\n"
     assert plain_notes(markdown) == "說明\n\n【修正】\n\n・超出：已修正\n　・子項目 code"

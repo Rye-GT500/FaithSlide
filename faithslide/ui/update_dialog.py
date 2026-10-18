@@ -5,25 +5,10 @@ import webbrowser
 from tkinter import messagebox, ttk
 
 from faithslide import updater
-from faithslide.ui.background import run_in_background
+from faithslide.background import run_in_background
 from faithslide.version import CURRENT_VERSION
 
 logger = logging.getLogger(__name__)
-
-
-def plain_notes(markdown: str) -> str:
-    """把 Release 說明的 Markdown 轉成適合直接顯示的文字。"""
-    lines = []
-    for line in markdown.replace("\r\n", "\n").split("\n"):
-        line = line.replace("**", "").replace("`", "")
-        stripped = line.lstrip()
-        if stripped.startswith("#"):
-            line = "【" + stripped.lstrip("#").strip() + "】"
-        elif stripped.startswith(("- ", "* ")):
-            indent = "　" * ((len(line) - len(stripped)) // 2)
-            line = f"{indent}・{stripped[2:]}"
-        lines.append(line)
-    return "\n".join(lines).strip()
 
 
 class UpdateDialog(tk.Toplevel):
@@ -43,7 +28,7 @@ class UpdateDialog(tk.Toplevel):
         ttk.Label(body, text=f"目前版本：v{CURRENT_VERSION}", foreground="gray").pack(anchor="w", pady=(2, 10))
 
         notes = tk.Text(body, height=10, wrap="char", relief="solid", borderwidth=1, padx=6, pady=4)
-        notes.insert("1.0", plain_notes(info.notes) or "（沒有更新說明）")
+        notes.insert("1.0", updater.plain_notes(info.notes) or "（沒有更新說明）")
         notes.config(state="disabled")
         notes.pack(fill="both", expand=True)
 

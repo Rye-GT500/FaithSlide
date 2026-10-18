@@ -44,7 +44,7 @@ def generate(word_path: str, ppt_path: str,
         logger.exception(f"讀取 Word 失敗：{word_path}")
         raise GenerationError(f"無法讀取 Word 檔：{e}") from e
     reading = parse_reading(report.reading_lines)
-    sermon = parse_sermon(report.sermon_text, settings.get("speaker_words"))
+    sermon = parse_sermon(report.sermon_text, settings.get(settings.SPEAKER_WORDS))
     result.warnings += reading.warnings + sermon.warnings
 
     try:

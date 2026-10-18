@@ -5,16 +5,14 @@ from tkinter import messagebox, ttk
 from faithslide import settings
 from faithslide.sermon_parser import speaker_word_problem
 
-SETTING_KEY = "speaker_words"
-
 
 class SpeakerTab(ttk.Frame):
     title = "講員"
 
     def __init__(self, parent):
         super().__init__(parent, padding=15)
-        self.defaults = settings.default(SETTING_KEY)
-        self.saved = settings.get(SETTING_KEY)
+        self.defaults = settings.default(settings.SPEAKER_WORDS)
+        self.saved = settings.get(settings.SPEAKER_WORDS)
         self.working = list(self.saved)   # 儲存前不生效
 
         self.grid_columnconfigure(0, weight=1)
@@ -74,7 +72,7 @@ class SpeakerTab(ttk.Frame):
     def save(self) -> bool:
         """儲存失敗時顯示原因並回傳 False。"""
         try:
-            settings.save(SETTING_KEY, self.working)
+            settings.save(settings.SPEAKER_WORDS, self.working)
         except OSError as e:
             messagebox.showwarning("無法儲存", f"寫入講員設定失敗：{e}", parent=self)
             return False

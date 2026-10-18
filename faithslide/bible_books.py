@@ -233,6 +233,23 @@ def check_aliases(aliases_by_book: dict[str, list[str]]) -> list[RejectedAlias]:
     return _apply_changes(default_books(), _diff_from_defaults(aliases_by_book))[1]
 
 
+def new_alias_problem(aliases_by_book: dict[str, list[str]], book_id: str, name: str) -> str | None:
+    """在目前的別名設定（書卷 id → 完整別名清單）中替 book_id 新增 name 的問題；沒有問題回傳 None。"""
+    problem = alias_problem(name)
+    if problem:
+        return problem
+    candidate = {**aliases_by_book, book_id: [*aliases_by_book.get(book_id, []), name]}
+    rejected = [r for r in check_aliases(candidate) if r.name == name]
+    return rejected[0].reason if rejected else None
+
+
+def alias_risk(name: str) -> str | None:
+    """格式正確但可能造成誤判的別名，回傳提醒文字，由使用者確認是否仍要新增；沒有風險回傳 None。"""
+    if len(name) == 1:
+        return f"單字別名「{name}」可能把證道標題中的文字誤判為書卷"
+    return None
+
+
 def save_user_aliases(aliases_by_book: dict[str, list[str]]) -> None:
     """儲存別名設定並立即生效；有任何別名被拒絕時拋出 AliasConflictError，不寫入。"""
     _ensure_loaded()

@@ -17,6 +17,8 @@ DEFAULT_SETTINGS_PATH = os.path.join(paths.DATA_DIR, "settings.default.json")
 USER_SETTINGS_FILENAME = "settings.json"
 SCHEMA_VERSION = 1
 
+SPEAKER_WORDS = "speaker_words"
+
 logger = logging.getLogger(__name__)
 
 _defaults: dict | None = None

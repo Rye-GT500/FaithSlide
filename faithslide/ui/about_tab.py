@@ -3,7 +3,7 @@ import os
 from tkinter import messagebox, ttk
 
 from faithslide import paths, updater
-from faithslide.ui.background import run_in_background
+from faithslide.background import run_in_background
 from faithslide.version import CURRENT_VERSION
 
 

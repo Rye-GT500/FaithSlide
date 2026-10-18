@@ -4,7 +4,7 @@ import tkinter as tk
 
 import pytest
 
-from faithslide.ui.background import run_in_background
+from faithslide.background import run_in_background
 
 
 @pytest.fixture

@@ -60,19 +60,14 @@ class AliasTab(ttk.Frame):
     def add(self):
         name = self.new_alias_var.get().strip()
         book = self.book
-        problem = bible_books.alias_problem(name)
+        problem = bible_books.new_alias_problem(self.working, book.id, name)
         if problem:
             messagebox.showwarning("無法新增", problem, parent=self)
             return
         if name in self.working[book.id]:
             return
-        candidate = {**self.working, book.id: self.working[book.id] + [name]}
-        rejected = [r for r in bible_books.check_aliases(candidate) if r.name == name]
-        if rejected:
-            messagebox.showwarning("無法新增", rejected[0].reason, parent=self)
-            return
-        if len(name) == 1 and not messagebox.askyesno(
-                "確認新增", f"單字別名「{name}」可能把證道標題中的文字誤判為書卷，確定要新增？", parent=self):
+        risk = bible_books.alias_risk(name)
+        if risk and not messagebox.askyesno("確認新增", f"{risk}，確定要新增？", parent=self):
             return
         self.working[book.id].append(name)
         self.new_alias_var.set("")

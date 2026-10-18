@@ -5,7 +5,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from faithslide import paths, pipeline
 from faithslide.pipeline import GenerationError
-from faithslide.ui.background import run_in_background
+from faithslide.background import run_in_background
 
 logger = logging.getLogger(__name__)
 

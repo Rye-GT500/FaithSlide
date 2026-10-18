@@ -171,3 +171,24 @@ def test_check_aliases():
     assert bible_books.check_aliases({"jas": ["各", "雅各"]}) == []
     rejected = bible_books.check_aliases({"jas": ["各", "羅"]})
     assert [(r.book_id, r.name) for r in rejected] == [("jas", "羅")]
+
+
+@pytest.mark.parametrize("name, problem", [
+    ("雅各", None),
+    ("", "不可為空白"),
+    ("雅1", "不可包含數字"),
+    ("羅", "羅馬書"),         # 已是其他書卷的名稱
+    ("新名", "約翰福音"),     # 與尚未儲存、已加在其他書卷的別名重複
+])
+def test_new_alias_problem(name, problem):
+    working = {"jas": ["各"], "jhn": ["新名"]}
+    result = bible_books.new_alias_problem(working, "jas", name)
+    if problem is None:
+        assert result is None
+    else:
+        assert problem in result
+
+
+def test_alias_risk_for_single_character():
+    assert "單字別名「各」" in bible_books.alias_risk("各")
+    assert bible_books.alias_risk("雅各") is None

@@ -151,3 +151,18 @@ def _remove(path: str) -> None:
         os.remove(path)
     except OSError:
         pass
+
+
+def plain_notes(markdown: str) -> str:
+    """把 Release 說明的 Markdown 轉成適合直接顯示的文字。"""
+    lines = []
+    for line in markdown.replace("\r\n", "\n").split("\n"):
+        line = line.replace("**", "").replace("`", "")
+        stripped = line.lstrip()
+        if stripped.startswith("#"):
+            line = "【" + stripped.lstrip("#").strip() + "】"
+        elif stripped.startswith(("- ", "* ")):
+            indent = "　" * ((len(line) - len(stripped)) // 2)
+            line = f"{indent}・{stripped[2:]}"
+        lines.append(line)
+    return "\n".join(lines).strip()
