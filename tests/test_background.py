@@ -7,7 +7,8 @@ import pytest
 from faithslide.background import run_in_background
 
 
-@pytest.fixture
+# 整個檔案共用一個 Tk：Windows 上關閉 Tk 後再建立新的，偶爾會讀不到 init.tcl / tk.tcl
+@pytest.fixture(scope="module")
 def root():
     root = tk.Tk()
     root.withdraw()
