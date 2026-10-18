@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 from pptx import Presentation
 from pptx.oxml.ns import qn
-from pptx.oxml.xmlchemy import OxmlElement
 from pptx.util import Length, Pt
 
 from faithslide.bible_api import Verse
@@ -26,10 +25,8 @@ _GLYPH_WIDTH_EM = {
     **{digit: 0.596 for digit in "0123456789"},
     ".": 0.254, " ": 0.25, "‧": 0.254, "·": 0.255, "•": 0.439, "—": 1.08, "…": 0.859,
 }
-_NUMBER_GAP_EM = 0.25     # 節數與經文之間的間隔
 # 開頭標點的字寬是 1 個字，但筆畫都在右半邊；懸掛到經文欄左側，讓後面的字與換行後的文字對齊
 _OPENING_PUNCTUATION = "「『（《〈【〔“‘"
-_HANGING_GAP_EM = 0.15    # 懸掛時節數與標點字格之間的間隔（標點字格左半邊本身是空白）
 
 # 字體大小計算：模擬 PowerPoint 的換行，找出放得下的最大字體（以 PowerPoint 實際排版校準）
 _MIN_FONT_SIZE = 20
@@ -119,12 +116,12 @@ class SlideBuilder:
         p = _first_paragraph(slide.shapes[1])
         # 去除前後空白：例如讀經「[1]」後的 Tab 會讓第一行跳到其他定位點
         text = verse.text.replace("　", " ").strip()
-        p.runs[0].text = number + "\t"
+        p.runs[0].text = number
         p.runs[1].text = text
         size = calculate_font_size(number, text, self.verse_area)
         p.runs[0].font.size = size
         p.runs[1].font.size = size
-        _set_hanging_indent(p, *_verse_indent(number, text, size))
+        _set_hanging_indent(p, _verse_column(number, text, size))
         return fits(number, text, size, self.verse_area)
 
     def save(self, path: str) -> None:
@@ -159,40 +156,37 @@ def _first_paragraph(shape):
     return p
 
 
-def _verse_indent(number: str, text: str, size: Length) -> tuple[int, int]:
-    """回傳 (經文欄位置, Tab 位置)，單位 EMU。
+def _number_width(number: str, size: Length) -> int:
+    """節數（如「16.」）的寬度，單位 EMU；經文第一行緊接在節數後面。"""
+    return round(size * sum(_GLYPH_WIDTH_EM.get(char, _GLYPH_WIDTH_EM["0"]) for char in number))
 
-    一般：節數後空一點就是經文欄，Tab 直接跳到經文欄。
-    開頭是標點時（標點懸掛）：Tab 跳到節數後，標點字格放在經文欄左側，後面的字才從經文欄開始。
+
+def _verse_column(number: str, text: str, size: Length) -> int:
+    """經文欄位置（換行後的文字起點），單位 EMU。
+
+    一般：經文欄就在節數後面，與第一行經文對齊。
+    開頭是標點時（標點懸掛）：標點字格緊接在節數後面，經文欄再往右一個字，與標點後面的字對齊。
     """
-    number_em = sum(_GLYPH_WIDTH_EM.get(char, _GLYPH_WIDTH_EM["0"]) for char in number)
+    column = _number_width(number, size)
     if text[:1] in _OPENING_PUNCTUATION:
-        tab_em = number_em + _HANGING_GAP_EM
-        column_em = tab_em + 1
-    else:
-        tab_em = column_em = number_em + _NUMBER_GAP_EM
-    return round(size * column_em), round(size * tab_em)
+        column += round(size)
+    return column
 
 
-def _set_hanging_indent(paragraph, column: int, tab_position: int) -> None:
-    """凸排：第一行從最左邊開始放節數，Tab 跳到 tab_position；換行後的文字從 column 開始。
+def _set_hanging_indent(paragraph, column: int) -> None:
+    """凸排：第一行從最左邊開始放節數，經文緊接在後；換行後的文字從 column 開始。
 
     範本內建的凸排是固定長度，只在原本的字體大小下對齊；字體會依經文長度調整，所以每張重新計算。
+    節數後不用 Tab：定位點若剛好在節數結尾，PowerPoint 會跳過它，直接跳到凸排位置。
     """
     pPr = paragraph._p.get_or_add_pPr()
     pPr.set("marL", str(column))
     pPr.set("indent", str(-column))
-    # 範本開啟了標點懸掛：行尾的「，」會掛到右邊界外（甚至超出投影片），PowerPoint 還會壓縮整行、
-    # 吃掉 Tab 的位置，讓第一行與其他行對不齊。關閉後由 wrap_lines 把標點連同前一個字移到下一行。
+    # 範本開啟了標點懸掛：行尾的「，」會掛到右邊界外（甚至超出投影片），PowerPoint 還會壓縮整行，
+    # 讓第一行與其他行對不齊。關閉後由 wrap_lines 把標點連同前一個字移到下一行。
     pPr.set("hangingPunct", "0")
     for old in pPr.findall(qn("a:tabLst")):
         pPr.remove(old)
-    tab_list = OxmlElement("a:tabLst")
-    tab = OxmlElement("a:tab")
-    tab.set("pos", str(tab_position))
-    tab.set("algn", "l")
-    tab_list.append(tab)
-    pPr.insert_element_before(tab_list, "a:defRPr", "a:extLst")
 
 
 def _outline_text(section: Section) -> str:
@@ -210,13 +204,13 @@ def _char_width_em(char: str) -> float:
 def wrap_lines(number: str, text: str, size: Length, area: TextArea = DEFAULT_TEXT_AREA) -> list[str]:
     """模擬 PowerPoint 的換行，回傳每一行的經文（不含節數）。
 
-    - 第一行從 Tab 位置開始，之後各行從經文欄開始。
+    - 第一行緊接在節數後面，之後各行從經文欄開始。
     - 經文段落關閉了標點懸掛：行尾放不下的結束標點（，。」等）連同前一個字一起移到下一行，
       避免下一行以標點開頭，也不會有標點跑到右邊界外。
     - 開頭標點（「等）不留在行尾，跟著下一個字換行。
     """
-    column, tab = _verse_indent(number, text, size)
-    limit = (area.width - tab) / size
+    column = _verse_column(number, text, size)
+    limit = (area.width - _number_width(number, size)) / size
     lines, line, used = [], "", 0.0
     for char in text:
         width = _char_width_em(char)

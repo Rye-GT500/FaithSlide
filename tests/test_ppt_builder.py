@@ -62,8 +62,8 @@ def test_verse(tmp_path):
     ])
     long_number, short_number = slides
     assert texts(long_number)[0][0] == "約翰福音三章16節"
-    assert texts(long_number)[1][:2] == ["16.\t", "神愛世人， 甚至"]
-    assert texts(short_number)[1][:2] == ["1.\t", "有一個法利賽人"]
+    assert texts(long_number)[1][:2] == ["16.", "神愛世人， 甚至"]
+    assert texts(short_number)[1][:2] == ["1.", "有一個法利賽人"]
     # 節數與經文使用相同字體大小（XML 以 1/100 點儲存）
     sizes = [run[1] for run in long_number["shapes"][1][0][:2]]
     assert sizes[0] == sizes[1]
@@ -129,7 +129,7 @@ def test_too_long_verse_reported(tmp_path):
 # --- 換行模擬（規則以 PowerPoint 實際排版校準） ---------------------------------
 
 def test_wrap_lines_width_follows_number_column():
-    # 72 點、節數「16.」：經文欄從 1.696 個字寬開始，可用 (945.6 - 122.1) / 72 = 11.4 個字
+    # 72 點、節數「16.」：經文欄從 1.446 個字寬開始，可用 (945.6 - 104.1) / 72 = 11.7 個字
     lines = wrap_lines("16.", "一二三四五六七八九十甲乙丙丁戊", Pt(72))
     assert lines == ["一二三四五六七八九十甲", "乙丙丁戊"]
 
@@ -181,27 +181,24 @@ def _number_em(number):
 
 @pytest.mark.parametrize("number, text", [(1, "短"), (16, "字" * 40), (176, "字" * 120)])
 def test_verse_hanging_indent_matches_number_width(tmp_path, number, text):
-    """換行後的文字要和第一行經文對齊：凸排距離與 Tab 定位點都等於節數欄寬，且隨字體大小縮放。"""
-    from faithslide.ppt_builder import _NUMBER_GAP_EM
-    expected = round(calculate_font_size(f"{number}.", text) * (_number_em(number) + _NUMBER_GAP_EM))
-    assert _verse_paragraph_props(tmp_path, number, text) == (expected, -expected, [(expected, "l")])
+    """經文緊接在節數後面；換行後的文字要和第一行經文對齊：凸排距離等於節數寬度，且隨字體大小縮放。"""
+    expected = round(calculate_font_size(f"{number}.", text) * _number_em(number))
+    assert _verse_paragraph_props(tmp_path, number, text) == (expected, -expected, [])
 
 
 @pytest.mark.parametrize("mark", ["「", "『", "（", "《", "〈", "【", "〔", "“", "‘"])
 def test_opening_punctuation_hangs_left(tmp_path, mark):
-    """標點懸掛：Tab 停在節數後，標點字格在經文欄左側，後面的字與換行後的文字同在經文欄。"""
-    from faithslide.ppt_builder import _HANGING_GAP_EM
+    """標點懸掛：標點字格緊接在節數後面、經文欄左側，後面的字與換行後的文字同在經文欄。"""
     text = mark + "神愛世人" * 10
     size = calculate_font_size("16.", text)
-    tab = round(size * (_number_em(16) + _HANGING_GAP_EM))
-    column = round(size * (_number_em(16) + _HANGING_GAP_EM + 1))
-    assert _verse_paragraph_props(tmp_path, 16, text) == (column, -column, [(tab, "l")])
+    column = round(size * _number_em(16)) + round(size)
+    assert _verse_paragraph_props(tmp_path, 16, text) == (column, -column, [])
 
 
 def test_verse_text_is_trimmed(tmp_path):
-    # 讀經「[1]」後常有 Tab，第二個 Tab 會讓第一行跳到其他定位點
+    # 讀經「[1]」後常有 Tab，會讓第一行跳到其他定位點
     _, slides = build(tmp_path, lambda b: b.add_verse("標題", Verse(1, "	 　以法蓮山地 ")))
-    assert texts(slides[0])[1][:2] == ["1.	", "以法蓮山地"]
+    assert texts(slides[0])[1][:2] == ["1.", "以法蓮山地"]
 
 
 def test_one_and_two_digit_verses_use_same_template(tmp_path):
