@@ -48,7 +48,7 @@ python build.py --remote                 # 依 commit 前綴建議升級幅度�
 python build.py --remote --bump minor    # 直接指定升級幅度
 ```
 
-1. 檢查 git 工作目錄乾淨、抓取遠端 tag，決定版本號。
+1. 檢查 git 工作目錄乾淨、抓取遠端 tag，決定版本號。本機落後遠端（例如在其他電腦發過版）時會中止；上次發版後改過的 Release 說明若是還沒發佈的其他版本、或改動了已發佈版本的說明，也會中止。
 2. 執行 pytest，失敗則中止。
 3. 改寫 `faithslide/version.py`，commit 並建立 tag `v<版本>`。
 4. 確認後 push 目前分支與 tag。
@@ -84,8 +84,8 @@ python build.py --no-git        # 只打包（本機測試用），不改版本�
 
 流程：
 
-1. 檢查 git 工作目錄乾淨、抓取遠端 tag。
-2. 列出上次 tag 之後的 commit 與建議升級幅度，確認新版本號。
+1. 檢查 git 工作目錄乾淨、抓取遠端 tag；本機落後遠端時中止。
+2. 列出上次 tag 之後的 commit 與建議升級幅度，確認新版本號；Release 說明檔的版本有誤時中止（同上）。
 3. 執行 pytest，失敗則中止。
 4. 改寫 `faithslide/version.py`。
 5. PyInstaller 打包 → `dist/FaithSlide.exe`。

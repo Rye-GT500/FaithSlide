@@ -64,3 +64,15 @@ def test_release_notes():
     commits = [classify(s) for s in ["新增：查詢單一輸入框", "內部：重構", "修正：標題切開", "新增：書卷別名"]]
     assert release_notes(commits) == "## 新增\n- 查詢單一輸入框\n- 書卷別名\n\n## 修正\n- 標題切開"
     assert "內部調整" in release_notes([classify("內部：重構")])
+
+
+def test_notes_problem():
+    problem = build.notes_problem
+    assert problem("1.4.3", "1.4.3", False, None, "新") is None
+    # 以為下一版是 1.4.2，其實 1.4.2 已在其他電腦發佈：覆蓋了已發佈的說明
+    assert "已發佈" in problem("1.4.2", "1.4.3", True, "舊", "新")
+    # 版本號猜錯，說明檔寫成還沒發佈的其他版本
+    assert "還沒發佈" in problem("1.5.0", "1.4.3", False, None, "新")
+    # 還原已發佈的說明、或替已發佈版本補上說明，都可以
+    assert problem("1.4.2", "1.4.4", True, "舊", "舊") is None
+    assert problem("1.4.3", "1.4.4", True, None, "補上") is None

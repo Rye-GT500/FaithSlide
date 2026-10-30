@@ -105,6 +105,22 @@ def release_notes(commits: list[Commit]) -> str:
     return "\n\n".join(sections) or "內部調整，無使用者可見的變更。"
 
 
+def notes_problem(notes_version: str, version: str, released: bool,
+                  text_at_release: str | None, text_now: str | None) -> str | None:
+    """上次發版後改過的 Release 說明檔是否有問題（多半是在其他電腦發過版，版本號猜錯）。
+
+    released：該版本的 tag 已存在；text_at_release：該 tag 當時的說明（沒有則為 None）。
+    已發佈版本補上原本沒有的說明、或還原成發佈時的內容，都可以。
+    """
+    if notes_version == version:
+        return None
+    if not released:
+        return f"{notes_version}.md 的版本既不是這次的 {version}，也還沒發佈"
+    if text_at_release is not None and text_now != text_at_release:
+        return f"{notes_version}.md 是已發佈版本的說明，內容與發佈時不同"
+    return None
+
+
 def github_repo(version_text: str) -> str:
     """從 GITHUB_API_URL 取出 owner/repo。"""
     match = re.search(r"api\.github\.com/repos/([^/]+/[^/]+)/releases", version_text)
@@ -165,6 +181,26 @@ def commits_since_last_tag(runner, rev: str = "HEAD") -> tuple[str | None, list[
     log_range = f"{last_tag}..{rev}" if last_tag else rev
     subjects = git(runner, "log", log_range, "--format=%s", side_effect=False).splitlines()
     return last_tag, [classify(s) for s in subjects if s]
+
+
+def check_changed_notes(runner, last_tag: str, version: str) -> list[str]:
+    changed = git(runner, "diff", "--name-only", last_tag, "HEAD", "--", "docs/release-notes",
+                  side_effect=False).splitlines()
+    problems = []
+    for path in changed:
+        notes_version = Path(path).stem
+        tag = f"v{notes_version}"
+        released = bool(git(runner, "tag", "--list", tag, side_effect=False))
+        try:
+            text_at_release = git(runner, "show", f"{tag}:{path}", side_effect=False) if released else None
+        except BuildError:
+            text_at_release = None      # 發佈時沒有這個說明檔
+        file = ROOT / path
+        text_now = file.read_text(encoding="utf-8").strip() if file.exists() else None
+        problem = notes_problem(notes_version, version, released, text_at_release, text_now)
+        if problem:
+            problems.append(problem)
+    return problems
 
 
 def choose_version(current: str, commits: list[Commit], args) -> str:
@@ -295,6 +331,13 @@ def main(argv=None):
         gh = find_gh(runner)
     if not args.no_git:
         git(runner, "fetch", "--tags", "--quiet", side_effect=False)
+        # 在不同電腦發版時，本機可能還沒拉到另一台電腦發的版本
+        try:
+            behind = int(git(runner, "rev-list", "--count", "HEAD..@{u}", side_effect=False))
+        except BuildError:
+            behind = 0      # 沒有追蹤遠端分支
+        if behind:
+            raise BuildError(f"本機落後遠端 {behind} 個 commit，請先 git pull（可能已在其他電腦發過版）")
 
     print("\n2. 決定版本號")
     last_tag, commits = commits_since_last_tag(runner)
@@ -306,6 +349,11 @@ def main(argv=None):
     if not args.no_git and git(runner, "tag", "--list", tag, side_effect=False):
         raise BuildError(f"tag {tag} 已存在；只想重新打包請用 --no-git")
     print(f"版本：{current} → {version}")
+    if last_tag and not args.no_git:
+        problems = check_changed_notes(runner, last_tag, version)
+        if problems:
+            raise BuildError("Release 說明有問題（可能已在其他電腦發過版）：\n  " + "\n  ".join(problems)
+                             + f"\n這次的說明請放在 docs/release-notes/{version}.md")
     if args.remote:
         source = notes_file(version) if notes_file(version).exists() else "依 commit 自動產生"
         print(f"Release 說明：{source}")
