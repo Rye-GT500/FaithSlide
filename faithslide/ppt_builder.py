@@ -25,7 +25,7 @@ _GLYPH_WIDTH_EM = {
     **{digit: 0.596 for digit in "0123456789"},
     ".": 0.254, " ": 0.25, "‧": 0.254, "·": 0.255, "•": 0.439, "—": 1.08, "…": 0.859,
 }
-# 開頭標點的字寬是 1 個字，但筆畫都在右半邊；懸掛到經文欄左側，讓後面的字與換行後的文字對齊
+# 開頭標點：經文以它開頭時，換行後的文字與它對齊（不多縮一格）
 _OPENING_PUNCTUATION = "「『（《〈【〔“‘"
 
 # 字體大小計算：模擬 PowerPoint 的換行，找出放得下的最大字體（以 PowerPoint 實際排版校準）
@@ -121,7 +121,7 @@ class SlideBuilder:
         size = calculate_font_size(number, text, self.verse_area)
         p.runs[0].font.size = size
         p.runs[1].font.size = size
-        _set_hanging_indent(p, _verse_column(number, text, size))
+        _set_hanging_indent(p, _number_width(number, size))
         return fits(number, text, size, self.verse_area)
 
     def save(self, path: str) -> None:
@@ -161,18 +161,6 @@ def _number_width(number: str, size: Length) -> int:
     return round(size * sum(_GLYPH_WIDTH_EM.get(char, _GLYPH_WIDTH_EM["0"]) for char in number))
 
 
-def _verse_column(number: str, text: str, size: Length) -> int:
-    """經文欄位置（換行後的文字起點），單位 EMU。
-
-    一般：經文欄就在節數後面，與第一行經文對齊。
-    開頭是標點時（標點懸掛）：標點字格緊接在節數後面，經文欄再往右一個字，與標點後面的字對齊。
-    """
-    column = _number_width(number, size)
-    if text[:1] in _OPENING_PUNCTUATION:
-        column += round(size)
-    return column
-
-
 def _set_hanging_indent(paragraph, column: int) -> None:
     """凸排：第一行從最左邊開始放節數，經文緊接在後；換行後的文字從 column 開始。
 
@@ -209,7 +197,6 @@ def wrap_lines(number: str, text: str, size: Length, area: TextArea = DEFAULT_TE
       避免下一行以標點開頭，也不會有標點跑到右邊界外。
     - 開頭標點（「等）不留在行尾，跟著下一個字換行。
     """
-    column = _verse_column(number, text, size)
     limit = (area.width - _number_width(number, size)) / size
     lines, line, used = [], "", 0.0
     for char in text:
@@ -231,7 +218,6 @@ def wrap_lines(number: str, text: str, size: Length, area: TextArea = DEFAULT_TE
         lines.append(line[:split])
         line = line[split:] + char
         used = sum(_char_width_em(c) for c in line)
-        limit = (area.width - column) / size
     lines.append(line)
     return lines
 

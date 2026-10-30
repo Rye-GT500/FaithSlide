@@ -187,11 +187,11 @@ def test_verse_hanging_indent_matches_number_width(tmp_path, number, text):
 
 
 @pytest.mark.parametrize("mark", ["「", "『", "（", "《", "〈", "【", "〔", "“", "‘"])
-def test_opening_punctuation_hangs_left(tmp_path, mark):
-    """標點懸掛：標點字格緊接在節數後面、經文欄左側，後面的字與換行後的文字同在經文欄。"""
+def test_opening_punctuation_not_extra_indented(tmp_path, mark):
+    """經文以開頭標點開始時，換行後的文字與標點對齊，不多縮一格。"""
     text = mark + "神愛世人" * 10
     size = calculate_font_size("16.", text)
-    column = round(size * _number_em(16)) + round(size)
+    column = round(size * _number_em(16))
     assert _verse_paragraph_props(tmp_path, 16, text) == (column, -column, [])
 
 
